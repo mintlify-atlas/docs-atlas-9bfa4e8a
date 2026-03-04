@@ -1,0 +1,132 @@
+{
+  "projectType": "api-service",
+  "projectName": "Furniture Store Backend",
+  "projectDescription": "Flask-based backend for managing furniture manufacturing processes, inventory, and catalogs",
+  "theme": "maple",
+  "primaryColor": "#8B4513",
+  "lightColor": "#D2691E",
+  "darkColor": "#5C2E0A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "architecture",
+              "mvc-pattern",
+              "database-models"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "environment-setup",
+              "database-configuration",
+              "migrations"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Catalog Endpoints",
+            "pages": [
+              "api/catalogs/colors",
+              "api/catalogs/wood-types",
+              "api/catalogs/furniture-types",
+              "api/catalogs/unit-of-measures",
+              "api/catalogs/roles"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/color",
+              "api/models/wood-type",
+              "api/models/furniture-type",
+              "api/models/unit-of-measure",
+              "api/models/role"
+            ]
+          },
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/overview",
+              "api/services/validation",
+              "api/services/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Developer Guide",
+            "pages": [
+              "development/coding-conventions",
+              "development/project-structure",
+              "development/adding-modules"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/production"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Catalog management for colors, wood types, and furniture types",
+    "RESTful endpoints with Flask blueprints",
+    "SQLAlchemy ORM with MySQL database",
+    "Layered MVC architecture with services layer",
+    "CSRF protection with Flask-WTF",
+    "Soft delete functionality with audit trails",
+    "Database migrations with Alembic",
+    "Centralized error handling with custom exceptions"
+  ],
+  "publicApiSurface": [
+    "GET /colors - List all active colors",
+    "POST /colors/create - Create a new color",
+    "GET /colors/<id>/edit - Get color for editing",
+    "POST /colors/<id>/edit - Update an existing color",
+    "POST /colors/<id>/delete - Soft delete a color",
+    "GET /wood-types - List all active wood types",
+    "POST /wood-types/create - Create a new wood type",
+    "GET /wood-types/<id>/edit - Get wood type for editing",
+    "POST /wood-types/<id>/edit - Update an existing wood type",
+    "POST /wood-types/<id>/delete - Soft delete a wood type",
+    "GET /roles - List all active roles",
+    "POST /roles/create - Create a new role",
+    "GET /roles/<id>/edit - Get role for editing",
+    "POST /roles/<id>/edit - Update an existing role",
+    "POST /roles/<id>/delete - Soft delete a role",
+    "GET /unit-of-measures - List all active units of measure",
+    "POST /unit-of-measures/create - Create a new unit of measure",
+    "GET /unit-of-measures/<id>/edit - Get unit of measure for editing",
+    "POST /unit-of-measures/<id>/edit - Update an existing unit of measure",
+    "POST /unit-of-measures/<id>/delete - Soft delete a unit of measure",
+    "ColorService.get_all() - Retrieve all active colors",
+    "ColorService.create(data) - Create a new color",
+    "ColorService.get_by_id(id) - Get color by ID",
+    "ColorService.update(id, data) - Update existing color",
+    "ColorService.delete(id) - Soft delete a color"
+  ]
+}
