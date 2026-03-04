@@ -1,0 +1,266 @@
+---
+title: "Furniture Types API"
+description: "API endpoints for managing furniture type catalog entries"
+---
+
+## Overview
+
+The Furniture Types API provides endpoints to manage furniture type catalog entries in the furniture store system. This catalog defines the different categories of furniture items available.
+
+**Base URL:** `/furniture-type` (Note: Blueprint not yet registered in main app)
+
+<Warning>
+  The furniture_type blueprint is defined but not registered in `app/__init__.py`. You may need to add:
+  ```python
+  from .catalogs.furniture_type import furniture_type_bp
+  app.register_blueprint(furniture_type_bp, url_prefix='/furniture-types')
+  ```
+</Warning>
+
+## Endpoints
+
+### List Furniture Types
+
+Retrieve all active furniture types from the catalog.
+
+```http
+GET /furniture-type/
+```
+
+#### Response
+
+Returns an HTML page with the list of furniture types. For API consumption, furniture types are represented as:
+
+<ResponseField name="id_furniture_type" type="integer">
+  Unique identifier for the furniture type
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the furniture type (max 50 characters)
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the furniture type is active
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET http://localhost:5000/furniture-type/ \
+  -H "Accept: text/html"
+```
+
+#### Example Response
+
+```json
+[
+  {
+    "id_furniture_type": 1,
+    "name": "Chair",
+    "active": true,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "id_furniture_type": 2,
+    "name": "Table",
+    "active": true,
+    "created_at": "2024-01-16T14:20:00Z",
+    "updated_at": "2024-01-16T14:20:00Z"
+  },
+  {
+    "id_furniture_type": 3,
+    "name": "Cabinet",
+    "active": true,
+    "created_at": "2024-01-17T09:15:00Z",
+    "updated_at": "2024-01-17T09:15:00Z"
+  }
+]
+```
+
+---
+
+### Create Furniture Type
+
+Create a new furniture type entry in the catalog.
+
+```http
+GET  /furniture-type/create
+POST /furniture-type/create
+```
+
+**GET** - Displays the creation form
+**POST** - Processes form submission and creates the furniture type
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Name of the furniture type
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Tipo de mueble creado exitosamente"
+- Redirects to `/furniture-type/create`
+
+**Error Cases:**
+
+<ResponseField name="ConflictError" type="error">
+  Returned when a furniture type with the same name already exists
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/furniture-type/create \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Bookshelf" \
+  -d "csrf_token=your_csrf_token"
+```
+
+#### Success Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-success">
+  Tipo de mueble creado exitosamente
+</div>
+```
+
+#### Error Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-error">
+  Ya existe un tipo de mueble con ese nombre
+</div>
+```
+
+---
+
+<Note>
+  **Edit and Delete endpoints are not yet implemented** in the source code (`app/catalogs/furniture_type/routes.py`). The file only contains the list and create endpoints (lines 13-48).
+</Note>
+
+### Edit Furniture Type (Not Implemented)
+
+This endpoint is not yet implemented in the codebase.
+
+```http
+GET  /furniture-type/<id_furniture_type>/edit
+POST /furniture-type/<id_furniture_type>/edit
+```
+
+<Warning>
+  This endpoint needs to be implemented. Expected implementation should follow the same pattern as colors and roles modules.
+</Warning>
+
+---
+
+### Delete Furniture Type (Not Implemented)
+
+This endpoint is not yet implemented in the codebase.
+
+```http
+POST /furniture-type/<id_furniture_type>/delete
+```
+
+<Warning>
+  This endpoint needs to be implemented. Expected implementation should perform logical deletion similar to other catalog endpoints.
+</Warning>
+
+---
+
+## Data Model
+
+### Furniture Type Object
+
+```python
+{
+  "id_furniture_type": 1,
+  "name": "Chair",
+  "active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Validation Rules
+
+- **name**: Required, unique, max 50 characters
+- **active**: Boolean, defaults to `true`
+- All endpoints require CSRF token for POST requests
+
+## Error Messages
+
+| Error | Message |
+|-------|----------|
+| Missing name | "El nombre del tipo de mueble es requerido" |
+| Name too long | "El nombre no puede exceder 50 caracteres" |
+| Duplicate name | "Ya existe un tipo de mueble con ese nombre" |
+
+## Implementation Details
+
+- **Source:** `app/catalogs/furniture_type/routes.py:13-48`
+- **Form:** `app/catalogs/furniture_type/forms.py:10-19`
+- **Model:** `app/models/furniture_type.py:6-61`
+- **Pattern:** Post-Redirect-Get (PRG) for all form submissions
+- **Status:** Partial implementation - only list and create endpoints are complete
+
+## Development Notes
+
+### TODO
+
+1. Register blueprint in `app/__init__.py`:
+   ```python
+   from .catalogs.furniture_type import furniture_type_bp
+   app.register_blueprint(furniture_type_bp, url_prefix='/furniture-types')
+   ```
+
+2. Implement edit endpoint following the pattern from `app/catalogs/colors/routes.py:51-84`
+
+3. Implement delete endpoint following the pattern from `app/catalogs/colors/routes.py:87-106`
+
+4. Add appropriate error handling for NotFoundError and ValidationError
+
+### Example Edit Implementation
+
+```python
+@furniture_type_bp.route("/<int:id_furniture_type>/edit", methods=["GET", "POST"])
+def edit_furniture_type(id_furniture_type: int):
+    try:
+        furniture_type = FurnitureTypeService.get_by_id(id_furniture_type)
+    except NotFoundError as e:
+        flash(e.message, "error")
+        return redirect(url_for("furniture_type.list_furniture_type"))
+
+    form = FurnitureTypeForm()
+
+    if form.validate_on_submit():
+        data = {"name": form.name.data}
+        try:
+            FurnitureTypeService.update(id_furniture_type, data)
+            flash("Tipo de mueble actualizado exitosamente", "success")
+            return redirect(url_for("furniture_type.list_furniture_type"))
+        except (ConflictError, ValidationError) as e:
+            flash(e.message, "error")
+
+    elif request.method == "GET":
+        form.name.data = furniture_type.name
+
+    return render_template("furniture_type/edit.html", form=form, furniture_type=furniture_type)
+```

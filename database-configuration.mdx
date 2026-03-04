@@ -1,0 +1,379 @@
+---
+title: 'Database Configuration'
+description: 'Configure MySQL database connections and SQLAlchemy settings'
+---
+
+## Overview
+
+The Furniture Store Backend uses MySQL as its database system with SQLAlchemy as the ORM (Object-Relational Mapping) layer. The application uses PyMySQL as the MySQL database driver.
+
+## MySQL Connection Setup
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install MySQL Server">
+    Ensure MySQL 5.7+ or MySQL 8.0+ is installed on your system.
+    
+    ```bash
+    # Check MySQL version
+    mysql --version
+    ```
+  </Step>
+  
+  <Step title="Create Database">
+    Create a database for the application:
+    
+    ```sql
+    CREATE DATABASE furniture_store_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+  </Step>
+  
+  <Step title="Create Database User">
+    Create a dedicated user with appropriate permissions:
+    
+    ```sql
+    CREATE USER 'furniture_user'@'localhost' IDENTIFIED BY 'secure_password';
+    GRANT ALL PRIVILEGES ON furniture_store_dev.* TO 'furniture_user'@'localhost';
+    FLUSH PRIVILEGES;
+    ```
+  </Step>
+</Steps>
+
+### Connection String Format
+
+The application constructs the SQLAlchemy database URI automatically from environment variables:
+
+```python
+SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+```
+
+#### Connection String Components
+
+<ParamField path="Protocol" type="string">
+  `mysql+pymysql` - Specifies MySQL database with PyMySQL driver
+</ParamField>
+
+<ParamField path="DB_USER" type="string">
+  Database username for authentication
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string">
+  Database password for authentication
+</ParamField>
+
+<ParamField path="DB_HOST" type="string">
+  Database server hostname (e.g., `localhost`, `127.0.0.1`, or remote host)
+</ParamField>
+
+<ParamField path="DB_PORT" type="string">
+  Database server port (default: `3306`)
+</ParamField>
+
+<ParamField path="DB_NAME" type="string">
+  Name of the database to connect to
+</ParamField>
+
+### Example Configurations
+
+<CodeGroup>
+```bash Local Development
+DB_USER=dev_user
+DB_PASSWORD=dev_password
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=furniture_store_dev
+```
+
+```bash Remote Database
+DB_USER=app_user
+DB_PASSWORD=secure_remote_password
+DB_HOST=db.example.com
+DB_PORT=3306
+DB_NAME=furniture_store_prod
+```
+
+```bash Docker Container
+DB_USER=root
+DB_PASSWORD=root_password
+DB_HOST=mysql_container
+DB_PORT=3306
+DB_NAME=furniture_store
+```
+</CodeGroup>
+
+## SQLAlchemy Configuration
+
+The application uses Flask-SQLAlchemy for database operations. Configuration is defined in `config.py`:
+
+```python config.py
+class Config:
+    # Database connection URI
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+    
+    # Disable modification tracking to save resources
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+
+### Configuration Options
+
+<AccordionGroup>
+  <Accordion title="SQLALCHEMY_DATABASE_URI">
+    The database connection string. This is the primary configuration option that tells SQLAlchemy how to connect to your database.
+    
+    **Format**: `dialect+driver://username:password@host:port/database`
+  </Accordion>
+
+  <Accordion title="SQLALCHEMY_TRACK_MODIFICATIONS">
+    Set to `False` to disable Flask-SQLAlchemy's modification tracking system.
+    
+    **Why disable it?**
+    - Reduces memory overhead
+    - Improves performance
+    - The feature is deprecated and will be removed in future versions
+    
+    <Note>This setting is recommended by Flask-SQLAlchemy documentation unless you specifically need the modification tracking feature.</Note>
+  </Accordion>
+</AccordionGroup>
+
+## Database Extensions Initialization
+
+Extensions are initialized in `app/extensions.py`:
+
+```python app/extensions.py
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
+
+db = SQLAlchemy()
+migrate = Migrate()
+csrf = CSRFProtect()
+```
+
+These extensions are then initialized with the Flask application:
+
+```python app/__init__.py
+from flask import Flask
+from config import Config
+from .extensions import csrf, db, migrate
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    
+    # Initialize extensions with the app
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    
+    # Import models to register them with SQLAlchemy
+    from . import models
+    
+    return app
+```
+
+<Info>
+  The `db.init_app()` pattern allows you to create the database object separately from the Flask app, enabling the application factory pattern.
+</Info>
+
+## Database Initialization
+
+### Creating Tables
+
+After configuring the database connection, you need to create the database tables. The application uses Flask-Migrate (Alembic) for this:
+
+```bash
+# Initialize migrations (first time only)
+flask db init
+
+# Create initial migration
+flask db migrate -m "Initial migration"
+
+# Apply migrations to create tables
+flask db upgrade
+```
+
+<Note>
+  See the [Migrations](/migrations) page for detailed information about database migrations.
+</Note>
+
+### Manual Table Creation (Not Recommended)
+
+While not recommended for production, you can create tables manually using SQLAlchemy:
+
+```python
+from app import create_app
+from app.extensions import db
+
+app = create_app()
+
+with app.app_context():
+    db.create_all()
+    print("All tables created successfully!")
+```
+
+<Warning>
+  Using `db.create_all()` does not track schema changes. Always use migrations for production applications.
+</Warning>
+
+## Testing Database Connection
+
+The application includes a built-in connection test in `run.py`:
+
+```python run.py
+from app import create_app
+from app.extensions import db
+
+app = create_app()
+
+# Test database connection
+with app.app_context():
+    try:
+        connection = db.engine.connect()
+        print("Database connection successful!")
+        connection.close()
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+```
+
+Run this test:
+
+```bash
+python run.py
+```
+
+### Expected Output
+
+<CodeGroup>
+```text Success
+Database connection successful!
+ * Serving Flask app 'run'
+ * Debug mode: on
+```
+
+```text Failure
+Database connection failed: (pymysql.err.OperationalError) 
+(2003, "Can't connect to MySQL server on 'localhost' ([Errno 61] Connection refused)")
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Refused Error">
+    **Error**: `Can't connect to MySQL server`
+    
+    **Solutions**:
+    - Verify MySQL server is running: `sudo systemctl status mysql`
+    - Check `DB_HOST` and `DB_PORT` values in `.env`
+    - Ensure firewall allows connections on port 3306
+    - For remote connections, verify the host is accessible
+  </Accordion>
+
+  <Accordion title="Authentication Failed">
+    **Error**: `Access denied for user`
+    
+    **Solutions**:
+    - Verify `DB_USER` and `DB_PASSWORD` are correct
+    - Check user has proper privileges: `SHOW GRANTS FOR 'user'@'host';`
+    - Ensure user is created for correct host (e.g., `localhost` vs `%`)
+    - Try connecting manually: `mysql -u username -p -h host database`
+  </Accordion>
+
+  <Accordion title="Database Does Not Exist">
+    **Error**: `Unknown database`
+    
+    **Solutions**:
+    - Verify database exists: `SHOW DATABASES;`
+    - Create the database: `CREATE DATABASE database_name;`
+    - Check `DB_NAME` in `.env` matches the actual database name
+  </Accordion>
+
+  <Accordion title="PyMySQL Not Installed">
+    **Error**: `No module named 'pymysql'`
+    
+    **Solution**:
+    ```bash
+    pip install pymysql
+    ```
+    
+    Or install from requirements.txt:
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Accordion>
+
+  <Accordion title="Character Encoding Issues">
+    **Error**: Incorrect string value or encoding errors
+    
+    **Solutions**:
+    - Ensure database uses UTF-8: `ALTER DATABASE dbname CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+    - Add charset to connection string:
+    ```python
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Database Connection Pooling
+
+SQLAlchemy automatically manages connection pooling. For production environments, you may want to configure pool settings:
+
+```python config.py
+class Config:
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Optional: Connection pool settings
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+    }
+```
+
+<ParamField path="pool_size" type="int">
+  Number of connections to keep open (default: 5)
+</ParamField>
+
+<ParamField path="pool_recycle" type="int">
+  Number of seconds after which to recycle connections (prevents timeout issues)
+</ParamField>
+
+<ParamField path="pool_pre_ping" type="bool">
+  Test connections before using them (prevents "MySQL server has gone away" errors)
+</ParamField>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Strong Passwords" icon="key">
+    Always use strong, unique passwords for database users
+  </Card>
+  <Card title="Principle of Least Privilege" icon="shield-halved">
+    Grant only necessary permissions to application users
+  </Card>
+  <Card title="Secure Connections" icon="lock">
+    Use SSL/TLS for remote database connections
+  </Card>
+  <Card title="Regular Backups" icon="floppy-disk">
+    Implement automated database backup strategies
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Migrations" icon="arrows-rotate" href="/migrations">
+    Learn how to manage database schema changes with Flask-Migrate
+  </Card>
+  <Card title="Environment Setup" icon="gear" href="/environment-setup">
+    Configure environment variables and application settings
+  </Card>
+</CardGroup>

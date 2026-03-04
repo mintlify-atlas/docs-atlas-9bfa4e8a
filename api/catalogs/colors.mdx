@@ -1,0 +1,266 @@
+---
+title: "Colors API"
+description: "API endpoints for managing color catalog entries"
+---
+
+## Overview
+
+The Colors API provides endpoints to manage color catalog entries in the furniture store system. All color operations support CRUD functionality with logical deletion.
+
+**Base URL:** `/colors`
+
+## Endpoints
+
+### List Colors
+
+Retrieve all active colors from the catalog.
+
+```http
+GET /colors/
+```
+
+#### Response
+
+Returns an HTML page with the list of colors. For API consumption, colors are represented as:
+
+<ResponseField name="id_color" type="integer">
+  Unique identifier for the color
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the color (max 50 characters)
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the color is active
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET http://localhost:5000/colors/ \
+  -H "Accept: text/html"
+```
+
+#### Example Response
+
+```json
+[
+  {
+    "id_color": 1,
+    "name": "Mahogany",
+    "active": true,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "id_color": 2,
+    "name": "Walnut",
+    "active": true,
+    "created_at": "2024-01-16T14:20:00Z",
+    "updated_at": "2024-01-16T14:20:00Z"
+  }
+]
+```
+
+---
+
+### Create Color
+
+Create a new color entry in the catalog.
+
+```http
+GET  /colors/create
+POST /colors/create
+```
+
+**GET** - Displays the creation form
+**POST** - Processes form submission and creates the color
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Name of the color
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Color creado exitosamente"
+- Redirects to `/colors/create`
+
+**Error Cases:**
+
+<ResponseField name="ConflictError" type="error">
+  Returned when a color with the same name already exists
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/colors/create \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Cherry" \
+  -d "csrf_token=your_csrf_token"
+```
+
+#### Error Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-error">
+  Ya existe un color con ese nombre
+</div>
+```
+
+---
+
+### Edit Color
+
+Update an existing color in the catalog.
+
+```http
+GET  /colors/<id_color>/edit
+POST /colors/<id_color>/edit
+```
+
+**GET** - Displays the edit form pre-populated with current data
+**POST** - Processes form submission and updates the color
+
+#### Path Parameters
+
+<ParamField path="id_color" type="integer" required>
+  Unique identifier of the color to edit
+</ParamField>
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Updated name for the color
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Color actualizado exitosamente"
+- Redirects to `/colors/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the color ID does not exist
+  
+  Redirects to `/colors/` with error message
+</ResponseField>
+
+<ResponseField name="ConflictError" type="error">
+  Returned when the updated name conflicts with an existing color
+</ResponseField>
+
+<ResponseField name="ValidationError" type="error">
+  Returned when validation rules are violated
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/colors/1/edit \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Dark Mahogany" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+### Delete Color
+
+Perform logical deletion of a color (marks as inactive).
+
+```http
+POST /colors/<id_color>/delete
+```
+
+#### Path Parameters
+
+<ParamField path="id_color" type="integer" required>
+  Unique identifier of the color to delete
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Color eliminado exitosamente"
+- Redirects to `/colors/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the color ID does not exist
+  
+  Redirects to `/colors/` with error message
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/colors/1/delete \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+## Data Model
+
+### Color Object
+
+```python
+{
+  "id_color": 1,
+  "name": "Mahogany",
+  "active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Validation Rules
+
+- **name**: Required, unique, max 50 characters
+- **active**: Boolean, defaults to `true`
+- All endpoints require CSRF token for POST requests
+
+## Error Messages
+
+| Error | Message |
+|-------|----------|
+| Missing name | "El nombre del color es requerido" |
+| Name too long | "El nombre no puede exceder 50 caracteres" |
+| Duplicate name | "Ya existe un color con ese nombre" |
+| Not found | Color-specific error message from service |
+
+## Implementation Details
+
+- **Source:** `app/catalogs/colors/routes.py:13-106`
+- **Form:** `app/catalogs/colors/forms.py:10-19`
+- **Model:** `app/models/color.py:6-61`
+- **Pattern:** Post-Redirect-Get (PRG) for all form submissions
+- **Deletion:** Logical (soft delete) - sets `active=false` and `deleted_at` timestamp

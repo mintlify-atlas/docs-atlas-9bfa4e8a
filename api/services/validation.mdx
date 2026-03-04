@@ -1,0 +1,272 @@
+---
+title: 'Service Validation Logic'
+description: 'Input validation, data normalization, and uniqueness constraints'
+---
+
+## Validation Strategy
+
+Services implement multi-layered validation to ensure data integrity:
+
+1. **Required Field Validation** - Check for presence of mandatory fields
+2. **Data Normalization** - Trim whitespace and standardize format
+3. **Uniqueness Validation** - Prevent duplicate entries
+4. **Integrity Constraints** - Database-level constraint handling
+
+## Required Field Validation
+
+All create and update operations validate required fields before database interaction.
+
+### Empty Name Check
+
+```python app/catalogs/colors/services.py
+name = data.get("name")
+
+if not name or not name.strip():
+    raise ValidationError("El nombre del color es requerido")
+```
+
+This pattern checks for:
+- Missing key in dictionary (`not name`)
+- Empty string (`"")`
+- Whitespace-only string (`" "`, `"\t"`, `"\n"`)
+
+### Multi-Field Validation
+
+Some services require multiple fields:
+
+```python app/catalogs/unit_of_measures/services.py
+name = data.get("name", "").strip() 
+abbreviation = data.get("abbreviation", "").strip() 
+
+if not name:
+    raise ValidationError("El nombre de la unidad de medida es requerido")
+if not abbreviation:
+    raise ValidationError("La abreviatura de la unidad de medida es requerida")
+```
+
+Validation provides specific error messages for each missing field.
+
+## Data Normalization
+
+Before validation and persistence, data is normalized to ensure consistency.
+
+### Whitespace Trimming
+
+```python app/catalogs/roles/services.py
+name = data.get("name")
+
+if not name or not name.strip():
+    raise ValidationError("El nombre del rol es requerido")
+
+name = name.strip()  # Remove leading/trailing whitespace
+```
+
+**Normalization benefits**:
+- Prevents accidental spaces in names
+- Ensures consistent database entries
+- Improves search and comparison operations
+
+### Example Normalization Flow
+
+```python
+# Input: "  Red Color  "
+name = data.get("name")        # "  Red Color  "
+if not name.strip():           # Check after stripping
+    raise ValidationError(...)
+name = name.strip()            # "Red Color"
+# Stored: "Red Color"
+```
+
+## Uniqueness Validation
+
+Services prevent duplicate entries using database queries before insert/update operations.
+
+### Case-Insensitive Uniqueness (Colors)
+
+```python app/catalogs/colors/services.py
+from sqlalchemy import func
+
+# Create validation
+existing = Color.query.filter(
+    func.lower(Color.name) == name.lower()
+).first()
+if existing:
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+```
+
+**Behavior**:
+- `"Red"` and `"red"` are considered duplicates
+- `"Blue"` and `"BLUE"` are considered duplicates
+- Prevents case variations of the same name
+
+### Case-Insensitive Uniqueness (Unit of Measures)
+
+```python app/catalogs/unit_of_measures/services.py
+existing = UnitOfMeasure.query.filter(
+    func.lower(UnitOfMeasure.name) == func.lower(name)
+).first()
+if existing:
+    raise ConflictError(f"Ya existe una unidad de medida con el nombre '{name}'")
+```
+
+Using `func.lower()` on both sides ensures database-level case-insensitive comparison.
+
+### Case-Sensitive Uniqueness (Wood Types)
+
+```python app/catalogs/wood_types/services.py
+existing = WoodType.query.filter_by(name=name).first()
+if existing:
+    raise ConflictError(f"Ya existe un tipo de madera con el nombre '{name}'")
+```
+
+Some catalogs use exact matching without case conversion.
+
+### Update Uniqueness Validation
+
+When updating, exclude the current record from uniqueness checks:
+
+```python app/catalogs/colors/services.py
+# Update validation - exclude current record
+existing = (
+    db.session.query(Color.id_color)
+    .filter(
+        func.lower(Color.name) == name.lower(),
+        Color.id_color != id_color  # Exclude self
+    )
+    .first()
+    is not None
+)
+
+if existing:
+    raise ConflictError(f"Ya existe otro color con el nombre '{name}'")
+```
+
+**Why exclude current record?**
+- Allows updating without changing the name
+- Only checks for conflicts with OTHER records
+- Prevents false positive when name remains unchanged
+
+### Alternative Update Pattern
+
+```python app/catalogs/roles/services.py
+existing = Role.query.filter(
+    Role.name == name,
+    Role.id_role != id_role  # Exclude current role
+).first()
+if existing:
+    raise ConflictError(f"Ya existe un rol con el nombre '{name}'")
+```
+
+## IntegrityError Handling
+
+Database-level constraints provide a final safety layer.
+
+### Transaction Rollback on Constraint Violation
+
+```python app/catalogs/colors/services.py
+from sqlalchemy.exc import IntegrityError
+
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+```
+
+**Why catch IntegrityError?**
+- Handles race conditions between uniqueness check and commit
+- Catches database-level UNIQUE constraint violations
+- Ensures database consistency even under concurrent requests
+- Provides user-friendly error messages
+
+### Update with IntegrityError
+
+```python app/catalogs/unit_of_measures/services.py
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()
+    raise ConflictError(
+        "Ocurrió un error al actualizar la unidad de medida. Intente nuevamente."
+    )
+```
+
+## Complete Validation Flow
+
+Here's the full validation sequence for creating a record:
+
+```python app/catalogs/colors/services.py
+@staticmethod
+def create(data: dict) -> dict:
+    # Step 1: Extract data
+    name = data.get("name")
+
+    # Step 2: Required field validation
+    if not name or not name.strip():
+        raise ValidationError("El nombre del color es requerido")
+
+    # Step 3: Normalization
+    name = name.strip()
+
+    # Step 4: Uniqueness validation
+    existing = Color.query.filter(
+        func.lower(Color.name) == name.lower()
+    ).first()
+    if existing:
+        raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+    # Step 5: Create model instance
+    color = Color(name=name)
+    db.session.add(color)
+
+    # Step 6: Commit with integrity check
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+    return color.to_dict()
+```
+
+## Validation Patterns Summary
+
+| Validation Type | Example | Purpose |
+|----------------|---------|----------|
+| Empty check | `if not name or not name.strip()` | Reject missing/empty values |
+| Whitespace trim | `name = name.strip()` | Normalize input |
+| Case-insensitive unique | `func.lower(Color.name) == name.lower()` | Prevent case duplicates |
+| Exclude self in update | `Color.id_color != id_color` | Allow name unchanged |
+| IntegrityError catch | `except IntegrityError: rollback()` | Handle race conditions |
+
+## Common Validation Errors
+
+### ValidationError (400)
+
+Raised when required fields are missing or invalid:
+
+```python
+ValidationError("El nombre del color es requerido")
+ValidationError("El nombre de la unidad de medida es requerido")
+ValidationError("La abreviatura de la unidad de medida es requerida")
+```
+
+### ConflictError (409)
+
+Raised when uniqueness constraints are violated:
+
+```python
+ConflictError(f"Ya existe un color con el nombre '{name}'")
+ConflictError(f"Ya existe otro color con el nombre '{name}'")
+ConflictError("Ocurrió un error al crear la unidad de medida. Intente nuevamente.")
+```
+
+## Best Practices
+
+1. **Validate Early**: Check required fields before database queries
+2. **Normalize First**: Strip whitespace before validation and storage
+3. **Use Case-Insensitive Comparison**: Apply `func.lower()` for user-facing names
+4. **Always Catch IntegrityError**: Protect against race conditions
+5. **Always Rollback**: Call `db.session.rollback()` before re-raising
+6. **Provide Context**: Include the attempted value in error messages
+7. **Exclude Self in Updates**: Prevent false conflicts when name unchanged

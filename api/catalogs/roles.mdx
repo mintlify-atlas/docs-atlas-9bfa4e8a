@@ -1,0 +1,336 @@
+---
+title: "Roles API"
+description: "API endpoints for managing role catalog entries"
+---
+
+## Overview
+
+The Roles API provides endpoints to manage role catalog entries in the furniture store system. Roles are used for permission management and user profile assignment.
+
+**Base URL:** `/roles`
+
+## Endpoints
+
+### List Roles
+
+Retrieve all active roles from the catalog.
+
+```http
+GET /roles/
+```
+
+#### Response
+
+Returns an HTML page with the list of roles. For API consumption, roles are represented as:
+
+<ResponseField name="id_role" type="integer">
+  Unique identifier for the role
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the role (max 50 characters)
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the role is active
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET http://localhost:5000/roles/ \
+  -H "Accept: text/html"
+```
+
+#### Example Response
+
+```json
+[
+  {
+    "id_role": 1,
+    "name": "Admin",
+    "active": true,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "id_role": 2,
+    "name": "Editor",
+    "active": true,
+    "created_at": "2024-01-16T14:20:00Z",
+    "updated_at": "2024-01-16T14:20:00Z"
+  },
+  {
+    "id_role": 3,
+    "name": "Viewer",
+    "active": true,
+    "created_at": "2024-01-17T09:15:00Z",
+    "updated_at": "2024-01-17T09:15:00Z"
+  }
+]
+```
+
+---
+
+### Create Role
+
+Create a new role entry in the catalog.
+
+```http
+GET  /roles/create
+POST /roles/create
+```
+
+**GET** - Displays the creation form
+**POST** - Processes form submission and creates the role
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Name of the role
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Rol creado exitosamente"
+- Redirects to `/roles/create`
+
+**Error Cases:**
+
+<ResponseField name="ConflictError" type="error">
+  Returned when a role with the same name already exists
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/roles/create \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Manager" \
+  -d "csrf_token=your_csrf_token"
+```
+
+#### Success Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-success">
+  Rol creado exitosamente
+</div>
+```
+
+#### Error Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-error">
+  Ya existe un rol con ese nombre
+</div>
+```
+
+---
+
+### Edit Role
+
+Update an existing role in the catalog.
+
+```http
+GET  /roles/<id_role>/edit
+POST /roles/<id_role>/edit
+```
+
+**GET** - Displays the edit form pre-populated with current data
+**POST** - Processes form submission and updates the role
+
+#### Path Parameters
+
+<ParamField path="id_role" type="integer" required>
+  Unique identifier of the role to edit
+</ParamField>
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Updated name for the role
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Rol actualizado exitosamente"
+- Redirects to `/roles/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the role ID does not exist
+  
+  Redirects to `/roles/` with error message
+</ResponseField>
+
+<ResponseField name="ConflictError" type="error">
+  Returned when the updated name conflicts with an existing role
+</ResponseField>
+
+<ResponseField name="ValidationError" type="error">
+  Returned when validation rules are violated
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/roles/1/edit \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Super Admin" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+### Delete Role
+
+Perform logical deletion of a role (marks as inactive).
+
+```http
+POST /roles/<id_role>/delete
+```
+
+#### Path Parameters
+
+<ParamField path="id_role" type="integer" required>
+  Unique identifier of the role to delete
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Rol eliminado exitosamente"
+- Redirects to `/roles/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the role ID does not exist
+  
+  Redirects to `/roles/` with error message
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/roles/1/delete \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+## Data Model
+
+### Role Object
+
+```python
+{
+  "id_role": 1,
+  "name": "Admin",
+  "active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Validation Rules
+
+- **name**: Required, unique, max 50 characters
+- **active**: Boolean, defaults to `true`
+- All endpoints require CSRF token for POST requests
+
+## Error Messages
+
+| Error | Message |
+|-------|----------|
+| Missing name | "El nombre del rol es requerido" |
+| Name too long | "El nombre no puede exceder 50 caracteres" |
+| Duplicate name | "Ya existe un rol con ese nombre" |
+| Not found | Role-specific error message from service |
+
+## Implementation Details
+
+- **Source:** `app/catalogs/roles/routes.py:13-104`
+- **Form:** `app/catalogs/roles/forms.py:10-19`
+- **Model:** `app/models/role.py:4-58`
+- **Pattern:** Post-Redirect-Get (PRG) for all form submissions
+- **Deletion:** Logical (soft delete) - sets `active=false` and `deleted_at` timestamp
+
+## Common Role Examples
+
+### Typical Role Hierarchy
+
+```json
+[
+  {
+    "name": "Super Admin",
+    "description": "Full system access and configuration"
+  },
+  {
+    "name": "Admin",
+    "description": "Administrative access to most features"
+  },
+  {
+    "name": "Manager",
+    "description": "Manage products and orders"
+  },
+  {
+    "name": "Editor",
+    "description": "Edit content and catalog items"
+  },
+  {
+    "name": "Viewer",
+    "description": "Read-only access to system data"
+  },
+  {
+    "name": "Customer",
+    "description": "Standard customer access"
+  }
+]
+```
+
+## Security Considerations
+
+<Warning>
+  Deleting or modifying roles that are currently assigned to users may affect their access permissions. Ensure proper checks are in place before allowing role deletion.
+</Warning>
+
+## Best Practices
+
+1. Use descriptive, self-explanatory role names (e.g., "Sales Manager" instead of "SM")
+2. Maintain a clear role hierarchy with minimal overlap
+3. Avoid deleting roles that are actively assigned to users
+4. Consider implementing role permission mapping for fine-grained access control
+5. Regular audit of active roles and their assignments
+
+## Related Endpoints
+
+Roles are typically used in conjunction with:
+- User management endpoints
+- Permission assignment endpoints
+- Access control middleware

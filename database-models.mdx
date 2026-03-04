@@ -1,0 +1,714 @@
+---
+title: 'Database Models'
+description: 'Comprehensive guide to SQLAlchemy models, relationships, and data patterns'
+---
+
+## Overview
+
+The Furniture Store Backend uses **SQLAlchemy ORM** to define database models with a consistent structure. All catalog models follow the same pattern with built-in support for soft deletes, audit trails, and JSON serialization.
+
+## Model Architecture
+
+All models share common characteristics:
+
+- **Primary Key**: Auto-incrementing integer ID
+- **Business Fields**: Domain-specific attributes
+- **Soft Delete**: `active` flag and `deleted_at` timestamp
+- **Audit Trail**: Creation and modification tracking
+- **Serialization**: `to_dict()` method for JSON conversion
+
+## Base Model Pattern
+
+Every model follows this structure:
+
+```python
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class ModelName(db.Model):
+    __tablename__ = 'table_name'
+    
+    # Primary Key
+    id_field = db.Column(db.Integer, primary_key=True)
+    
+    # Business Fields
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Audit Trail - Timestamps
+    created_at = db.Column(db.TIMESTAMP, nullable=False,
+                          server_default=func.current_timestamp())
+    updated_at = db.Column(db.TIMESTAMP, nullable=False,
+                          server_default=func.current_timestamp(),
+                          server_onupdate=func.current_timestamp())
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    # Audit Trail - User Tracking
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        """Serialize model to dictionary"""
+        return {...}
+```
+
+## Model Definitions
+
+### Color Model
+
+Catalog of color references for furniture.
+
+```python app/models/color.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class Color(db.Model):
+    """
+    Color catalog model for furniture color references.
+    
+    Attributes:
+        id_color: Unique identifier
+        name: Color name (unique, 50 chars max)
+        active: Soft delete flag
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        deleted_at: Soft delete timestamp
+        created_by: User who created the record
+        updated_by: User who last updated the record
+        deleted_by: User who deleted the record
+    """
+    
+    __tablename__ = 'colors'
+    
+    # Primary Key
+    id_color = db.Column(db.Integer, primary_key=True)
+    
+    # Business Fields
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Audit Trail - Timestamps
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    # Audit Trail - User Tracking
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        """Serialize model to dictionary"""
+        return {
+            "id_color": self.id_color,
+            "name": self.name,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+<Note>
+The `to_dict()` method intentionally excludes soft delete fields (`deleted_at`, `deleted_by`) and user tracking for public API responses.
+</Note>
+
+### Role Model
+
+User roles for permissions and access control.
+
+```python app/models/role.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class Role(db.Model):
+    """
+    Role model for user permissions and profiles.
+    
+    Attributes:
+        id_role: Unique identifier
+        name: Role name (e.g., 'Admin', 'Editor', 'Viewer')
+        active: Soft delete flag
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        deleted_at: Soft delete timestamp
+        created_by: User who created the record
+        updated_by: User who last updated the record
+        deleted_by: User who deleted the record
+    """
+    
+    __tablename__ = 'roles'
+    
+    id_role = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        return {
+            "id_role": self.id_role,
+            "name": self.name,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+### WoodType Model
+
+Catalog of wood types for furniture construction.
+
+```python app/models/wood_type.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class WoodType(db.Model):
+    """
+    Wood type catalog model.
+    
+    Attributes:
+        id_wood_type: Unique identifier
+        name: Wood type name (100 chars max)
+        description: Optional description (255 chars max)
+        active: Soft delete flag
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        deleted_at: Soft delete timestamp
+        created_by: User who created the record
+        updated_by: User who last updated the record
+        deleted_by: User who deleted the record
+    """
+    
+    __tablename__ = 'wood_types'
+    
+    id_wood_type = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.String(255), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self):
+        return {
+            "id_wood_type": self.id_wood_type,
+            "name": self.name,
+            "description": self.description,
+            "active": self.active,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "deleted_at": self.deleted_at,
+        }
+```
+
+<Warning>
+Note the inconsistency in `WoodType.to_dict()`: it returns raw timestamps and includes `deleted_at`. This should be normalized to match other models:
+```python
+"created_at": self.created_at.isoformat() if self.created_at else None
+```
+</Warning>
+
+### UnitOfMeasure Model
+
+Units of measurement for furniture dimensions and materials.
+
+```python app/models/unit_of_measure.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class UnitOfMeasure(db.Model):
+    """
+    Unit of measure catalog model.
+    
+    Attributes:
+        id_unit_of_measure: Unique identifier
+        name: Unit name (50 chars max)
+        abbreviation: Short form (10 chars max, unique)
+        active: Soft delete flag
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        deleted_at: Soft delete timestamp
+        created_by: User who created the record
+        updated_by: User who last updated the record
+        deleted_by: User who deleted the record
+    """
+    
+    __tablename__ = 'unit_of_measures'
+    
+    id_unit_of_measure = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    abbreviation = db.Column(db.String(10), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        return {
+            "id_unit_of_measure": self.id_unit_of_measure,
+            "name": self.name,
+            "abbreviation": self.abbreviation,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+### FurnitureType Model
+
+Catalog of furniture categories.
+
+```python app/models/furniture_type.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class FurnitureType(db.Model):
+    """
+    Furniture type catalog model.
+    
+    Attributes:
+        id_furniture_type: Unique identifier
+        name: Furniture type name (50 chars max)
+        active: Soft delete flag
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        deleted_at: Soft delete timestamp
+        created_by: User who created the record
+        updated_by: User who last updated the record
+        deleted_by: User who deleted the record
+    """
+    
+    __tablename__ = 'furniture_type'
+    
+    id_furniture_type = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        return {
+            "id_furniture_type": self.id_furniture_type,
+            "name": self.name,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+## Model Registry
+
+All models are imported in `app/models/__init__.py` to register them with SQLAlchemy:
+
+```python app/models/__init__.py
+from .color import Color
+from .role import Role
+from .wood_type import WoodType
+from .unit_of_measure import UnitOfMeasure
+from .furniture_type import FurnitureType
+```
+
+<Note>
+This import is crucial for SQLAlchemy to discover and track the models. The application factory imports this module at `app/__init__.py:30`.
+</Note>
+
+## Field Types and Constraints
+
+<AccordionGroup>
+  <Accordion title="Primary Keys">
+    All models use auto-incrementing integer primary keys:
+    ```python
+    id_color = db.Column(db.Integer, primary_key=True)
+    ```
+    SQLAlchemy automatically handles the auto-increment behavior.
+  </Accordion>
+  
+  <Accordion title="String Fields">
+    String fields use `db.String(length)` with appropriate length limits:
+    ```python
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    description = db.Column(db.String(255), nullable=True)
+    abbreviation = db.Column(db.String(10), nullable=False, unique=True)
+    ```
+    
+    Common constraints:
+    - `nullable=False`: Required field
+    - `unique=True`: Unique constraint
+    - `nullable=True`: Optional field (default)
+  </Accordion>
+  
+  <Accordion title="Boolean Fields">
+    Boolean fields for flags and states:
+    ```python
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    ```
+    Always non-nullable with explicit default values.
+  </Accordion>
+  
+  <Accordion title="Timestamp Fields">
+    Timestamps use MySQL TIMESTAMP type with server-side defaults:
+    ```python
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    ```
+    
+    - `server_default`: Database sets the value on INSERT
+    - `server_onupdate`: Database updates the value on UPDATE
+    - Nullable `deleted_at` for soft deletes
+  </Accordion>
+</AccordionGroup>
+
+## Data Patterns
+
+### Soft Delete Pattern
+
+Models implement soft deletes using two fields:
+
+```python
+active = db.Column(db.Boolean, nullable=False, default=True)
+deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+```
+
+When deleting a record:
+
+```python
+color.active = False
+color.deleted_at = func.current_timestamp()
+db.session.commit()
+```
+
+<CardGroup cols={2}>
+  <Card title="Benefits" icon="check">
+    - Data preservation for audits
+    - Ability to "undelete" records
+    - Historical data analysis
+    - Referential integrity maintained
+  </Card>
+  <Card title="Query Pattern" icon="filter">
+    Always filter by `active=True` to exclude deleted records:
+    ```python
+    Color.query.filter_by(active=True).all()
+    ```
+  </Card>
+</CardGroup>
+
+### Audit Trail Pattern
+
+Every model tracks creation and modification:
+
+<Tabs>
+  <Tab title="Timestamp Tracking">
+    ```python
+    created_at = db.Column(db.TIMESTAMP, 
+                          server_default=func.current_timestamp())
+    updated_at = db.Column(db.TIMESTAMP,
+                          server_default=func.current_timestamp(),
+                          server_onupdate=func.current_timestamp())
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    ```
+    
+    Automatically managed by the database:
+    - `created_at`: Set on INSERT
+    - `updated_at`: Updated on every UPDATE
+    - `deleted_at`: Set manually during soft delete
+  </Tab>
+  
+  <Tab title="User Tracking">
+    ```python
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    ```
+    
+    Must be set manually in the service layer (currently not implemented):
+    ```python
+    color.created_by = current_user.username
+    color.updated_by = current_user.username
+    ```
+  </Tab>
+</Tabs>
+
+### Serialization Pattern
+
+Every model provides a `to_dict()` method for JSON serialization:
+
+```python
+def to_dict(self) -> dict:
+    """Serialize model to dictionary"""
+    return {
+        "id_color": self.id_color,
+        "name": self.name,
+        "active": self.active,
+        "created_at": self.created_at.isoformat() if self.created_at else None,
+        "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+    }
+```
+
+<Accordion title="Why use isoformat()?">
+The `isoformat()` method converts Python datetime objects to ISO 8601 string format:
+```python
+"2024-03-04T15:30:00"
+```
+This ensures consistent, timezone-aware serialization for JSON responses and API integration.
+</Accordion>
+
+## Common Model Operations
+
+### Creating Records
+
+```python
+from app.extensions import db
+from app.models.color import Color
+
+# Create instance
+color = Color(name="Blue")
+
+# Add to session
+db.session.add(color)
+
+# Commit transaction
+db.session.commit()
+
+# Access auto-generated ID
+print(color.id_color)
+```
+
+### Querying Records
+
+```python
+# Get all active records
+colors = Color.query.filter_by(active=True).all()
+
+# Get by primary key
+color = Color.query.get(1)
+
+# Query with conditions
+color = Color.query.filter(
+    func.lower(Color.name) == 'blue'
+).first()
+
+# Check existence
+exists = db.session.query(
+    Color.query.filter_by(name='Blue').exists()
+).scalar()
+```
+
+### Updating Records
+
+```python
+# Fetch record
+color = Color.query.get(1)
+
+# Modify attributes
+color.name = "Dark Blue"
+
+# Commit changes (updated_at auto-updates)
+db.session.commit()
+```
+
+### Deleting Records (Soft Delete)
+
+```python
+from sqlalchemy import func
+
+color = Color.query.get(1)
+color.active = False
+color.deleted_at = func.current_timestamp()
+db.session.commit()
+```
+
+### Serializing Records
+
+```python
+color = Color.query.get(1)
+color_dict = color.to_dict()
+
+# Returns:
+{
+    "id_color": 1,
+    "name": "Blue",
+    "active": True,
+    "created_at": "2024-03-04T15:30:00",
+    "updated_at": "2024-03-04T15:30:00"
+}
+```
+
+## Database Configuration
+
+Database connection is configured in `config.py`:
+
+```python config.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+    DB_NAME = os.getenv("DB_NAME")
+    
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+
+<Note>
+The application uses MySQL with the PyMySQL driver. Connection details are loaded from environment variables.
+</Note>
+
+## Model Comparison
+
+| Model | Table Name | Primary Key | Business Fields | Unique Fields |
+|-------|------------|-------------|-----------------|---------------|
+| Color | `colors` | `id_color` | `name`, `active` | `name` |
+| Role | `roles` | `id_role` | `name`, `active` | `name` |
+| WoodType | `wood_types` | `id_wood_type` | `name`, `description`, `active` | `name` |
+| UnitOfMeasure | `unit_of_measures` | `id_unit_of_measure` | `name`, `abbreviation`, `active` | `name`, `abbreviation` |
+| FurnitureType | `furniture_type` | `id_furniture_type` | `name`, `active` | `name` |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Filter by Active" icon="filter">
+    When querying, always filter out soft-deleted records:
+    ```python
+    Color.query.filter_by(active=True)
+    ```
+  </Card>
+  
+  <Card title="Use server_default for Timestamps" icon="clock">
+    Let the database manage timestamps:
+    ```python
+    server_default=func.current_timestamp()
+    ```
+  </Card>
+  
+  <Card title="Implement to_dict() Consistently" icon="code">
+    All models should serialize timestamps using `isoformat()` and exclude sensitive/internal fields.
+  </Card>
+  
+  <Card title="Handle Transactions Properly" icon="database">
+    Always wrap modifications in try/except with rollback:
+    ```python
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError("Duplicate")
+    ```
+  </Card>
+</CardGroup>
+
+## Relationships (Future Enhancement)
+
+Currently, models don't define relationships. Future enhancements could include:
+
+```python
+class Furniture(db.Model):
+    id_furniture = db.Column(db.Integer, primary_key=True)
+    
+    # Foreign keys
+    id_color = db.Column(db.Integer, db.ForeignKey('colors.id_color'))
+    id_wood_type = db.Column(db.Integer, db.ForeignKey('wood_types.id_wood_type'))
+    id_furniture_type = db.Column(db.Integer, 
+                                  db.ForeignKey('furniture_type.id_furniture_type'))
+    
+    # Relationships
+    color = db.relationship('Color', backref='furniture_items')
+    wood_type = db.relationship('WoodType', backref='furniture_items')
+    furniture_type = db.relationship('FurnitureType', backref='furniture_items')
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture">
+    Learn about the application structure
+  </Card>
+  <Card title="MVC Pattern" icon="layer-group" href="/mvc-pattern">
+    Understand the layered architecture
+  </Card>
+</CardGroup>

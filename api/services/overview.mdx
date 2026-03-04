@@ -1,0 +1,282 @@
+---
+title: 'Service Layer Overview'
+description: 'Understanding the service layer pattern and business logic architecture'
+---
+
+## Service Layer Architecture
+
+The service layer provides a clean separation between business logic and presentation concerns. Services encapsulate domain-specific operations, validation rules, and data transformations, acting as the primary interface between controllers/routes and the data access layer.
+
+### Key Responsibilities
+
+- **Business Logic**: Encapsulates domain-specific rules and operations
+- **Validation**: Enforces data integrity and business constraints
+- **Transaction Management**: Handles database operations and commits
+- **Error Handling**: Raises domain-specific exceptions for error conditions
+- **Data Transformation**: Converts between domain models and DTOs
+
+## Service Pattern Example
+
+All catalog services follow a consistent pattern. Here's the `ColorService` as a reference implementation:
+
+```python app/catalogs/colors/services.py
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+
+from app.exceptions import ConflictError, ValidationError, NotFoundError
+from app.extensions import db
+from app.models.color import Color
+
+class ColorService:
+    """Servicio para operaciones de negocio relacionadas con colores."""
+
+    @staticmethod
+    def get_all() -> list[Color]:
+        """Obtiene todos los colores activos."""
+        return Color.query.filter_by(active=True).all()
+
+    @staticmethod
+    def create(data: dict) -> dict:
+        """Crea un nuevo color en el catálogo."""
+        name = data.get("name")
+
+        if not name or not name.strip():
+            raise ValidationError("El nombre del color es requerido")
+
+        name = name.strip()
+
+        existing = Color.query.filter(
+            func.lower(Color.name) == name.lower()
+        ).first()
+        if existing:
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+        color = Color(name=name)
+        db.session.add(color)
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+        return color.to_dict()
+```
+
+## Common Service Methods
+
+All catalog services implement a standard set of CRUD operations:
+
+### get_all()
+
+Retrieves all active records from the catalog.
+
+```python
+@staticmethod
+def get_all() -> list[Color]:
+    """Obtiene todos los colores activos."""
+    return Color.query.filter_by(active=True).all()
+```
+
+**Returns**: List of active model instances
+
+### create(data: dict)
+
+Creates a new record with validation and conflict detection.
+
+```python
+@staticmethod
+def create(data: dict) -> dict:
+    """Crea un nuevo color en el catálogo."""
+    name = data.get("name")
+
+    # Validation
+    if not name or not name.strip():
+        raise ValidationError("El nombre del color es requerido")
+
+    name = name.strip()
+
+    # Uniqueness check
+    existing = Color.query.filter(
+        func.lower(Color.name) == name.lower()
+    ).first()
+    if existing:
+        raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+    # Create and persist
+    color = Color(name=name)
+    db.session.add(color)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+    return color.to_dict()
+```
+
+**Parameters**:
+- `data`: Dictionary containing model attributes
+
+**Returns**: Serialized model dictionary
+
+**Raises**:
+- `ValidationError`: Invalid or missing required fields
+- `ConflictError`: Duplicate name detected
+
+### get_by_id(id: int)
+
+Retrieves a specific record by its identifier.
+
+```python
+@staticmethod
+def get_by_id(id_color: int) -> Color:
+    """Obtiene un color por su ID."""
+    color = Color.query.get(id_color)
+
+    if not color:
+        raise NotFoundError(f"No se encontró un color con ID {id_color}")
+    return color
+```
+
+**Parameters**:
+- `id`: Primary key identifier
+
+**Returns**: Model instance
+
+**Raises**:
+- `NotFoundError`: Record not found
+
+### update(id: int, data: dict)
+
+Updates an existing record with validation.
+
+```python
+@staticmethod
+def update(id_color: int, data: dict) -> dict:
+    """Actualiza un color existente."""
+    color = ColorService.get_by_id(id_color)
+
+    name = data.get("name")
+    if not name or not name.strip():
+        raise ValidationError("El nombre del color es requerido")
+
+    name = name.strip()
+
+    # Check for conflicts with other records
+    existing = (
+        db.session.query(Color.id_color)
+        .filter(
+            func.lower(Color.name) == name.lower(),
+            Color.id_color != id_color
+        )
+        .first()
+        is not None
+    )
+
+    if existing:
+        raise ConflictError(f"Ya existe otro color con el nombre '{name}'")
+
+    color.name = name
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ConflictError(f"Ya existe otro color con el nombre '{name}'")
+
+    return color.to_dict()
+```
+
+**Parameters**:
+- `id`: Primary key identifier
+- `data`: Dictionary with updated attributes
+
+**Returns**: Serialized updated model
+
+**Raises**:
+- `NotFoundError`: Record not found
+- `ValidationError`: Invalid data
+- `ConflictError`: Duplicate name detected
+
+### delete(id: int)
+
+Performs soft deletion by marking records as inactive.
+
+```python
+@staticmethod
+def delete(id_color: int) -> None:
+    """Elimina un color con el ID."""
+    color = ColorService.get_by_id(id_color)
+
+    color.active = False
+    color.deleted_at = func.current_timestamp()
+
+    db.session.commit()
+```
+
+**Parameters**:
+- `id`: Primary key identifier
+
+**Returns**: None
+
+**Raises**:
+- `NotFoundError`: Record not found
+
+## Business Logic Separation
+
+Services enforce business rules independently of the presentation layer:
+
+### Example: Case-Insensitive Uniqueness
+
+```python
+# Colors use case-insensitive comparison
+existing = Color.query.filter(
+    func.lower(Color.name) == name.lower()
+).first()
+
+# Unit of Measures also use case-insensitive checks
+existing = UnitOfMeasure.query.filter(
+    func.lower(UnitOfMeasure.name) == func.lower(name)
+).first()
+```
+
+### Example: Multi-Field Validation
+
+```python app/catalogs/unit_of_measures/services.py
+name = data.get("name", "").strip() 
+abbreviation = data.get("abbreviation", "").strip() 
+
+if not name:
+    raise ValidationError("El nombre de la unidad de medida es requerido")
+if not abbreviation:
+    raise ValidationError("La abreviatura de la unidad de medida es requerida")
+```
+
+### Example: Soft Delete Pattern
+
+```python
+# Mark as inactive instead of hard delete
+role.active = False
+role.deleted_at = func.current_timestamp()
+db.session.commit()
+```
+
+## Service Design Principles
+
+1. **Static Methods**: Services use static methods as they don't maintain state
+2. **Transaction Safety**: All writes wrapped in try/except for IntegrityError
+3. **Early Validation**: Input validation before database queries
+4. **Consistent Exceptions**: Use domain exceptions (ValidationError, NotFoundError, ConflictError)
+5. **Idempotent Reads**: get_all() and get_by_id() have no side effects
+6. **Normalized Data**: Strip whitespace and normalize before persistence
+
+## Available Services
+
+- **ColorService** - app/catalogs/colors/services.py:13
+- **WoodTypeService** - app/catalogs/wood_types/services.py:11
+- **UnitOfMeasureService** - app/catalogs/unit_of_measures/services.py:13
+- **RoleService** - app/catalogs/roles/services.py:13
+
+Each service follows the same architectural pattern with consistent method signatures and error handling.

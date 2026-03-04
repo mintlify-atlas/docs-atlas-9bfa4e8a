@@ -1,0 +1,533 @@
+---
+title: 'Installation'
+description: 'Complete installation guide for the Furniture Store Backend'
+icon: 'download'
+---
+
+This guide provides detailed installation instructions for setting up the Furniture Store Backend on all major platforms.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Python 3.10.11" icon="python">
+    The exact Python version required for this project
+  </Card>
+  <Card title="MySQL 8.0+" icon="database">
+    Relational database for storing application data
+  </Card>
+  <Card title="pip" icon="box">
+    Python package manager (included with Python)
+  </Card>
+  <Card title="Git" icon="git">
+    Version control system for cloning the repository
+  </Card>
+</CardGroup>
+
+## Verify Python Installation
+
+Check that you have the correct Python version installed:
+
+<CodeGroup>
+  ```bash Windows
+  python --version
+  ```
+
+  ```bash macOS/Linux
+  python3 --version
+  ```
+</CodeGroup>
+
+You should see:
+
+```bash
+Python 3.10.11
+```
+
+<Warning>
+  This project requires **Python 3.10.11** specifically. Other versions may cause compatibility issues with dependencies.
+</Warning>
+
+### Installing Python 3.10.11
+
+If you don't have Python 3.10.11 installed:
+
+<Tabs>
+  <Tab title="Windows">
+    1. Download Python 3.10.11 from [python.org](https://www.python.org/downloads/release/python-31011/)
+    2. Run the installer
+    3. Check "Add Python to PATH"
+    4. Click "Install Now"
+    5. Verify installation: `python --version`
+  </Tab>
+  
+  <Tab title="macOS">
+    Using Homebrew:
+    
+    ```bash
+    brew install python@3.10
+    ```
+    
+    Or download from [python.org](https://www.python.org/downloads/release/python-31011/)
+  </Tab>
+  
+  <Tab title="Linux">
+    Using deadsnakes PPA (Ubuntu/Debian):
+    
+    ```bash
+    sudo add-apt-repository ppa:deadsnakes/ppa
+    sudo apt update
+    sudo apt install python3.10 python3.10-venv python3.10-dev
+    ```
+  </Tab>
+</Tabs>
+
+## MySQL Installation
+
+The Furniture Store Backend uses MySQL as its database system.
+
+<Tabs>
+  <Tab title="Windows">
+    1. Download MySQL Community Server from [mysql.com](https://dev.mysql.com/downloads/mysql/)
+    2. Run the installer and choose "Developer Default"
+    3. Set a root password during installation
+    4. Complete the installation wizard
+    5. Verify: Open MySQL Workbench or run `mysql --version`
+  </Tab>
+  
+  <Tab title="macOS">
+    Using Homebrew:
+    
+    ```bash
+    brew install mysql
+    brew services start mysql
+    mysql_secure_installation
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    ```bash
+    sudo apt update
+    sudo apt install mysql-server
+    sudo systemctl start mysql
+    sudo mysql_secure_installation
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Make note of your MySQL root password - you'll need it for database configuration.
+</Note>
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+Clone the project from your version control system:
+
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd backend-muebleria
+```
+
+### 2. Create Virtual Environment
+
+A virtual environment isolates project dependencies from your system Python installation.
+
+<CodeGroup>
+  ```bash Windows
+  python -m venv venv
+  ```
+
+  ```bash macOS/Linux
+  python3 -m venv venv
+  ```
+</CodeGroup>
+
+This creates a `venv` directory containing an isolated Python environment.
+
+### 3. Activate Virtual Environment
+
+<CodeGroup>
+  ```bash Windows (CMD)
+  venv\Scripts\activate
+  ```
+
+  ```bash Windows (PowerShell)
+  venv\Scripts\Activate.ps1
+  ```
+
+  ```bash macOS/Linux
+  source venv/bin/activate
+  ```
+</CodeGroup>
+
+<Note>
+  When successfully activated, your terminal prompt will show `(venv)` at the beginning.
+</Note>
+
+To deactivate later, simply run:
+
+```bash
+deactivate
+```
+
+### 4. Install Dependencies
+
+With the virtual environment activated, install all required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs the following key dependencies:
+
+```txt requirements.txt
+Flask==3.1.2
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.1.0
+Flask-WTF==1.2.2
+PyMySQL==1.1.2
+SQLAlchemy==2.0.46
+WTForms==3.2.1
+python-dotenv==1.2.1
+alembic==1.18.4
+```
+
+<Accordion title="View all dependencies">
+  The complete list includes:
+  - **Flask** (3.1.2) - Web framework
+  - **Flask-SQLAlchemy** (3.1.1) - ORM integration
+  - **Flask-Migrate** (4.1.0) - Database migrations
+  - **Flask-WTF** (1.2.2) - Form handling and CSRF protection
+  - **PyMySQL** (1.1.2) - MySQL database driver
+  - **SQLAlchemy** (2.0.46) - SQL toolkit and ORM
+  - **WTForms** (3.2.1) - Form validation
+  - **python-dotenv** (1.2.1) - Environment variable management
+  - **alembic** (1.18.4) - Database migration tool
+  - **black** (26.1.0) - Code formatter
+  - **mypy** (1.19.1) - Static type checker
+</Accordion>
+
+### 5. Environment Configuration
+
+Create your environment configuration file:
+
+```bash
+cp .env-template .env
+```
+
+Edit the `.env` file with your specific configuration:
+
+```bash .env
+FLASK_APP=app.py
+FLASK_ENV=development
+
+DB_USER=your_mysql_username
+DB_PASSWORD=your_mysql_password
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=furniture_store_db
+```
+
+<Warning>
+  **Security Best Practices:**
+  - Never commit the `.env` file to version control
+  - Use strong passwords for production databases
+  - The `.env` file is already in `.gitignore`
+</Warning>
+
+#### Understanding the Configuration
+
+The application uses these environment variables in `config.py`:
+
+```python config.py
+class Config:
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+    DB_NAME = os.getenv("DB_NAME")
+
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        if os.getenv("FLASK_ENV") == "production":
+            raise ValueError("SECRET_KEY must be set in production environment")
+        SECRET_KEY = "dev-secret-key-change-in-production"
+```
+
+### 6. Database Initialization
+
+#### Create the Database
+
+Connect to MySQL and create the application database:
+
+```bash
+mysql -u root -p
+```
+
+Then in the MySQL prompt:
+
+```sql
+CREATE DATABASE furniture_store_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT ALL PRIVILEGES ON furniture_store_db.* TO 'your_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+Or create it directly from the command line:
+
+```bash
+mysql -u root -p -e "CREATE DATABASE furniture_store_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+#### Run Migrations
+
+Initialize the database schema using Flask-Migrate:
+
+```bash
+flask db upgrade
+```
+
+This executes all migration files to create the database structure:
+
+<Accordion title="What tables are created?">
+  The migrations create the following tables:
+  
+  - **colors** - Color catalog (Natural, White, Black, etc.)
+  - **wood_types** - Wood type catalog (Pine, Cedar, Oak, etc.)
+  - **furniture_types** - Furniture catalog (Tables, Chairs, Closets, etc.)
+  - **roles** - User roles and permissions
+  - **unit_of_measures** - Units of measurement (kg, m, pieces, etc.)
+  
+  Each table includes:
+  - Primary key (`id_*`)
+  - Timestamps (`created_at`, `updated_at`, `deleted_at`)
+  - Audit fields (`created_by`, `updated_by`, `deleted_by`)
+  - Soft delete support (`active` boolean)
+</Accordion>
+
+### 7. Verify Installation
+
+Start the development server:
+
+```bash
+python run.py
+```
+
+You should see:
+
+```bash
+Database connection successful!
+ * Serving Flask app 'app'
+ * Debug mode: on
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+```
+
+<Note>
+  The application automatically tests the database connection on startup (see `run.py:6-13`).
+</Note>
+
+#### Test the Application
+
+Open your browser and navigate to:
+
+```
+http://127.0.0.1:5000/colors/
+```
+
+You should see the colors catalog page.
+
+#### Run a Test Request
+
+Create a test color using curl:
+
+```bash
+curl -X POST http://127.0.0.1:5000/colors/create \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Test Color"
+```
+
+If successful, you'll receive a redirect response with a success message.
+
+## Project Structure
+
+After installation, your project structure will look like this:
+
+```
+backend-muebleria/
+├── app/                          # Application package
+│   ├── __init__.py               # Flask app factory
+│   ├── extensions.py             # Flask extensions (SQLAlchemy, Migrate, CSRF)
+│   ├── exceptions.py             # Custom exceptions
+│   ├── catalogs/                 # Catalog modules
+│   │   ├── colors/
+│   │   │   ├── routes.py         # Color endpoints
+│   │   │   ├── services.py       # Business logic
+│   │   │   └── forms.py          # WTForms definitions
+│   │   ├── wood_types/
+│   │   ├── furniture_type/
+│   │   ├── roles/
+│   │   └── unit_of_measures/
+│   ├── models/                   # Database models
+│   │   ├── color.py
+│   │   ├── wood_type.py
+│   │   ├── furniture_type.py
+│   │   ├── role.py
+│   │   └── unit_of_measure.py
+│   └── templates/                # Jinja2 templates
+├── migrations/                   # Database migrations
+│   └── versions/
+├── config.py                     # Application configuration
+├── run.py                        # Application entry point
+├── requirements.txt              # Python dependencies
+├── .env                          # Environment variables (create this)
+├── .env-template                 # Environment template
+└── .python-version               # Python version specification
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Make your first API request in 5 minutes
+  </Card>
+  <Card title="Architecture Overview" icon="building" href="/architecture">
+    Understand the MVC layered architecture
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/catalogs/colors">
+    Explore available endpoints and their usage
+  </Card>
+  <Card title="Development Guide" icon="wrench" href="/development/project-structure">
+    Learn coding conventions and best practices
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Python version mismatch">
+    If you have multiple Python versions installed, specify the version explicitly:
+    
+    ```bash
+    python3.10 -m venv venv
+    ```
+    
+    Or use pyenv to manage Python versions:
+    
+    ```bash
+    pyenv install 3.10.11
+    pyenv local 3.10.11
+    ```
+  </Accordion>
+
+  <Accordion title="MySQL connection errors">
+    Common issues:
+    
+    1. **Authentication failed**: Verify username and password in `.env`
+    2. **Cannot connect**: Ensure MySQL service is running
+       ```bash
+       # Windows
+       net start MySQL
+       
+       # macOS
+       brew services start mysql
+       
+       # Linux
+       sudo systemctl start mysql
+       ```
+    3. **Database doesn't exist**: Create the database first (see step 6)
+  </Accordion>
+
+  <Accordion title="pip install fails">
+    If you encounter errors during `pip install`:
+    
+    1. Upgrade pip:
+       ```bash
+       pip install --upgrade pip
+       ```
+    
+    2. Install build dependencies (Linux):
+       ```bash
+       sudo apt install python3.10-dev build-essential
+       ```
+    
+    3. Install packages individually to identify the problem:
+       ```bash
+       pip install Flask Flask-SQLAlchemy Flask-Migrate
+       ```
+  </Accordion>
+
+  <Accordion title="Migration errors">
+    If `flask db upgrade` fails:
+    
+    1. Check database connection:
+       ```bash
+       mysql -u your_user -p -e "SHOW DATABASES;"
+       ```
+    
+    2. Verify the database exists and is accessible
+    
+    3. Check migration history:
+       ```bash
+       flask db current
+       flask db history
+       ```
+    
+    4. If needed, recreate the database:
+       ```bash
+       mysql -u root -p -e "DROP DATABASE furniture_store_db;"
+       mysql -u root -p -e "CREATE DATABASE furniture_store_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+       flask db upgrade
+       ```
+  </Accordion>
+
+  <Accordion title="Port 5000 already in use">
+    If port 5000 is occupied, specify a different port:
+    
+    ```bash
+    flask run --port 5001
+    ```
+    
+    Or set it in `.env`:
+    ```bash
+    FLASK_RUN_PORT=5001
+    ```
+  </Accordion>
+
+  <Accordion title="Import errors">
+    Ensure you're in the correct directory and virtual environment is activated:
+    
+    ```bash
+    # Check you're in the project root
+    pwd  # or cd on Windows
+    
+    # Verify virtual environment is active
+    which python  # or where python on Windows
+    
+    # Should show path to venv/bin/python
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Additional Resources
+
+<CardGroup cols={3}>
+  <Card title="Flask Documentation" icon="flask" href="https://flask.palletsprojects.com/">
+    Official Flask documentation
+  </Card>
+  <Card title="SQLAlchemy" icon="database" href="https://docs.sqlalchemy.org/">
+    Learn about the ORM
+  </Card>
+  <Card title="MySQL Docs" icon="book" href="https://dev.mysql.com/doc/">
+    MySQL reference manual
+  </Card>
+</CardGroup>

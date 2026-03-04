@@ -1,0 +1,433 @@
+---
+title: 'Service Error Handling'
+description: 'Custom exceptions, error handlers, and response format'
+---
+
+## Exception Hierarchy
+
+The application uses a custom exception hierarchy for domain-specific error handling.
+
+### Base Exception Class
+
+```python app/exceptions.py
+from typing import Optional
+from flask import render_template
+
+class AppException(Exception):
+    """Excepción base de la aplicación."""
+
+    def __init__(
+        self, message: str, status_code: int = 500, payload: Optional[dict] = None
+    ):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self) -> dict:
+        """Convierte la excepción a un diccionario para la respuesta JSON."""
+        response = {
+            "success": False,
+            "error": {"message": self.message, "code": self.status_code},
+        }
+        if self.payload:
+            response["error"]["details"] = self.payload
+        return response
+```
+
+**Features**:
+- Consistent error response structure
+- Optional additional payload for context
+- HTTP status code mapping
+- JSON serialization support
+
+## Domain-Specific Exceptions
+
+### ValidationError (400)
+
+Raised when input data fails validation rules.
+
+```python app/exceptions.py
+class ValidationError(AppException):
+    """Excepción para errores de validación de datos de entrada."""
+
+    def __init__(
+        self,
+        message: str = "Datos de entrada inválidos",
+        payload: Optional[dict] = None,
+    ):
+        super().__init__(message, status_code=400, payload=payload)
+```
+
+**Usage in Services**:
+
+```python app/catalogs/colors/services.py
+if not name or not name.strip():
+    raise ValidationError("El nombre del color es requerido")
+```
+
+```python app/catalogs/unit_of_measures/services.py
+if not name:
+    raise ValidationError("El nombre de la unidad de medida es requerido")
+if not abbreviation:
+    raise ValidationError("La abreviatura de la unidad de medida es requerida")
+```
+
+**Response Example**:
+```json
+{
+  "success": false,
+  "error": {
+    "message": "El nombre del color es requerido",
+    "code": 400
+  }
+}
+```
+
+### NotFoundError (404)
+
+Raised when a requested resource does not exist.
+
+```python app/exceptions.py
+class NotFoundError(AppException):
+    """Excepción para recursos no encontrados."""
+
+    def __init__(
+        self, message: str = "Recurso no encontrado", payload: Optional[dict] = None
+    ):
+        super().__init__(message, status_code=404, payload=payload)
+```
+
+**Usage in Services**:
+
+```python app/catalogs/colors/services.py
+@staticmethod
+def get_by_id(id_color: int) -> Color:
+    color = Color.query.get(id_color)
+    
+    if not color:
+        raise NotFoundError(f"No se encontró un color con ID {id_color}")
+    return color
+```
+
+```python app/catalogs/wood_types/services.py
+wood_type = WoodType.query.get(id_wood_type)
+if not wood_type:
+    raise NotFoundError(f"No se encontró el tipo de madera con ID {id_wood_type}")
+```
+
+```python app/catalogs/unit_of_measures/services.py
+unit_of_measure = UnitOfMeasure.query.get(id_unit_of_measure)
+if not unit_of_measure:
+    raise NotFoundError("Unidad de medida no encontrada")
+```
+
+**Response Example**:
+```json
+{
+  "success": false,
+  "error": {
+    "message": "No se encontró un color con ID 42",
+    "code": 404
+  }
+}
+```
+
+### ConflictError (409)
+
+Raised when an operation conflicts with existing data (e.g., duplicate entries).
+
+```python app/exceptions.py
+class ConflictError(AppException):
+    """Excepción para conflictos de datos (ej: duplicados)."""
+
+    def __init__(
+        self,
+        message: str = "Conflicto con el recurso existente",
+        payload: Optional[dict] = None,
+    ):
+        super().__init__(message, status_code=409, payload=payload)
+```
+
+**Usage in Services**:
+
+```python app/catalogs/colors/services.py
+# Uniqueness check
+existing = Color.query.filter(
+    func.lower(Color.name) == name.lower()
+).first()
+if existing:
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+# IntegrityError handling
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+```
+
+```python app/catalogs/roles/services.py
+existing = Role.query.filter_by(name=name).first()
+if existing:
+    raise ConflictError(f"Ya existe un rol con el nombre '{name}'")
+```
+
+**Response Example**:
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Ya existe un color con el nombre 'Red'",
+    "code": 409
+  }
+}
+```
+
+## Error Response Format
+
+All exceptions follow a consistent JSON structure:
+
+```python
+{
+  "success": False,
+  "error": {
+    "message": "<error description>",
+    "code": <http_status_code>,
+    "details": {<optional_payload>}  # Only if payload provided
+  }
+}
+```
+
+### Basic Error Response
+
+```python
+raise ValidationError("El nombre del color es requerido")
+
+# Response:
+{
+  "success": false,
+  "error": {
+    "message": "El nombre del color es requerido",
+    "code": 400
+  }
+}
+```
+
+### Error Response with Payload
+
+```python
+raise ValidationError(
+    "Campos requeridos faltantes",
+    payload={"missing_fields": ["name", "abbreviation"]}
+)
+
+# Response:
+{
+  "success": false,
+  "error": {
+    "message": "Campos requeridos faltantes",
+    "code": 400,
+    "details": {
+      "missing_fields": ["name", "abbreviation"]
+    }
+  }
+}
+```
+
+## Global Error Handlers
+
+Error handlers are registered at the application level for consistent error responses.
+
+### AppException Handler
+
+```python app/exceptions.py
+def register_error_handlers(app):
+    """Registra los manejadores de errores globales en la aplicación Flask."""
+
+    @app.errorhandler(AppException)
+    def handle_app_exception(error):
+        """Manejador para excepciones personalizadas de la aplicación."""
+        app.logger.error(f"AppException: {error.message}")
+        return (
+            render_template(
+                "errors/error.html",
+                code=error.status_code,
+                message=error.message,
+            ),
+            error.status_code,
+        )
+```
+
+Catches all `ValidationError`, `NotFoundError`, and `ConflictError` exceptions.
+
+### Standard HTTP Error Handlers
+
+```python app/exceptions.py
+@app.errorhandler(400)
+def handle_bad_request(error):
+    """Manejador para errores 400 Bad Request."""
+    return (
+        render_template(
+            "errors/error.html",
+            code=400,
+            message="Solicitud incorrecta",
+        ),
+        400,
+    )
+
+@app.errorhandler(404)
+def handle_not_found(error):
+    """Manejador para errores 404 Not Found."""
+    return (
+        render_template(
+            "errors/error.html",
+            code=404,
+            message="Página no encontrada",
+        ),
+        404,
+    )
+
+@app.errorhandler(405)
+def handle_method_not_allowed(error):
+    """Manejador para errores 405 Method Not Allowed."""
+    return (
+        render_template(
+            "errors/error.html",
+            code=405,
+            message="Método no permitido",
+        ),
+        405,
+    )
+
+@app.errorhandler(500)
+def handle_internal_error(error):
+    """Manejador para errores 500 Internal Server Error."""
+    app.logger.error(f"500 Error: {error}")
+    return (
+        render_template(
+            "errors/error.html",
+            code=500,
+            message="Error interno del servidor",
+        ),
+        500,
+    )
+```
+
+## Error Handling Patterns
+
+### Pattern 1: Early Validation
+
+```python
+def create(data: dict) -> dict:
+    # Validate immediately
+    name = data.get("name")
+    if not name or not name.strip():
+        raise ValidationError("El nombre del color es requerido")
+    
+    # Continue with business logic...
+```
+
+**Benefits**:
+- Fail fast on invalid input
+- Avoid unnecessary database queries
+- Clear error messages to clients
+
+### Pattern 2: Resource Existence Check
+
+```python
+@staticmethod
+def get_by_id(id_color: int) -> Color:
+    color = Color.query.get(id_color)
+    
+    if not color:
+        raise NotFoundError(f"No se encontró un color con ID {id_color}")
+    return color
+
+@staticmethod
+def update(id_color: int, data: dict) -> dict:
+    # Reuse get_by_id for existence check
+    color = ColorService.get_by_id(id_color)
+    # Continue with update...
+```
+
+**Benefits**:
+- Consistent error messages
+- DRY principle (Don't Repeat Yourself)
+- Automatic NotFoundError propagation
+
+### Pattern 3: Uniqueness with Conflict Detection
+
+```python
+# Check before insert
+existing = Color.query.filter(
+    func.lower(Color.name) == name.lower()
+).first()
+if existing:
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+# Create entity
+color = Color(name=name)
+db.session.add(color)
+
+# Catch race conditions
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+```
+
+**Benefits**:
+- Proactive conflict detection
+- Race condition protection
+- Consistent error handling
+
+### Pattern 4: Transaction Rollback
+
+```python
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()  # Critical: Always rollback
+    raise ConflictError("<error message>")
+```
+
+**Benefits**:
+- Maintains database consistency
+- Prevents partial commits
+- Allows retry after rollback
+
+## Exception Usage Summary
+
+| Exception | Status Code | Use Case | Example |
+|-----------|-------------|----------|----------|
+| `ValidationError` | 400 | Invalid or missing input | Empty name, missing required field |
+| `NotFoundError` | 404 | Resource doesn't exist | Invalid ID, deleted record |
+| `ConflictError` | 409 | Duplicate or constraint violation | Duplicate name, IntegrityError |
+| `AppException` | 500 | Generic application error | Unexpected failures |
+
+## Error Logging
+
+All AppExceptions are automatically logged:
+
+```python
+app.logger.error(f"AppException: {error.message}")
+app.logger.error(f"500 Error: {error}")
+```
+
+**Logged information**:
+- Error type and message
+- Stack trace for debugging
+- Request context (automatic via Flask)
+
+## Best Practices
+
+1. **Use Specific Exceptions**: Prefer `ValidationError`, `NotFoundError`, `ConflictError` over generic `AppException`
+2. **Include Context**: Add entity name and identifier in error messages
+3. **Always Rollback**: Call `db.session.rollback()` before re-raising after IntegrityError
+4. **Fail Fast**: Validate input before expensive operations
+5. **Consistent Messages**: Use similar phrasing across services
+6. **Reuse get_by_id**: Let existing methods handle NotFoundError
+7. **Log Appropriately**: Let handlers log errors automatically
+8. **Don't Catch Without Re-raising**: Always propagate or transform exceptions

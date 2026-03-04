@@ -1,0 +1,253 @@
+---
+title: Introduction
+description: Flask-based backend for managing furniture manufacturing processes, inventory, and catalogs
+mode: custom
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-[#8B4513] via-[#A0522D] to-[#D2691E] dark:from-[#5C2E0A] dark:via-[#6B3410] dark:to-[#8B4513] py-20">
+  <div className="absolute inset-0 bg-black/10 dark:bg-black/20"></div>
+  <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Furniture Store Backend API
+        </h1>
+        <p className="text-lg sm:text-xl text-white/90 max-w-2xl mb-8">
+          A comprehensive Flask-based backend system for managing furniture manufacturing operations, from raw materials to finished products.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#8B4513] font-semibold hover:bg-white/90 transition-colors no-underline"
+          >
+            Get Started
+          </a>
+          <a 
+            href="/api/catalogs/colors" 
+            className="inline-flex items-center px-6 py-3 rounded-lg border-2 border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors no-underline"
+          >
+            Explore API
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                <span className="text-white text-xl">📦</span>
+              </div>
+              <div>
+                <div className="text-white font-semibold">Inventory Management</div>
+                <div className="text-white/70 text-sm">Track materials and products</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                <span className="text-white text-xl">🏭</span>
+              </div>
+              <div>
+                <div className="text-white font-semibold">Production Control</div>
+                <div className="text-white/70 text-sm">Monitor manufacturing processes</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                <span className="text-white text-xl">📊</span>
+              </div>
+              <div>
+                <div className="text-white font-semibold">Catalog System</div>
+                <div className="text-white/70 text-sm">Manage wood types, colors, and furniture</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get your furniture store backend up and running in minutes
+  </p>
+
+  <Steps>
+    <Step title="Clone the repository">
+      Clone the project and navigate to the directory:
+      
+      ```bash
+      git clone https://github.com/furniture-store-utl/backend-furniture-store.git
+      cd backend-furniture-store
+      ```
+    </Step>
+
+    <Step title="Set up virtual environment">
+      Create and activate a Python virtual environment:
+      
+      ```bash
+      python -m venv venv
+      source venv/bin/activate  # On Windows: venv\Scripts\activate
+      ```
+    </Step>
+
+    <Step title="Install dependencies">
+      Install all required Python packages:
+      
+      ```bash
+      pip install -r requirements.txt
+      ```
+    </Step>
+
+    <Step title="Configure environment">
+      Create a `.env` file based on the template:
+      
+      ```bash
+      cp .env-template .env
+      ```
+      
+      Edit `.env` with your database credentials:
+      
+      ```bash
+      DB_USER=your_user
+      DB_PASSWORD=your_password
+      DB_HOST=localhost
+      DB_PORT=3306
+      DB_NAME=furniture_store_db
+      ```
+    </Step>
+
+    <Step title="Run the application">
+      Start the Flask development server:
+      
+      ```bash
+      python run.py
+      ```
+      
+      The server will start at `http://127.0.0.1:5000`
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Key Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need to manage a furniture manufacturing operation
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Catalog Management" icon="palette" href="/api/catalogs/colors">
+      Manage colors, wood types, furniture types, units of measure, and user roles with full CRUD operations
+    </Card>
+    <Card title="RESTful Architecture" icon="code" href="/architecture">
+      Clean MVC pattern with Flask blueprints, service layer, and SQLAlchemy ORM
+    </Card>
+    <Card title="Database Management" icon="database" href="/database-models">
+      MySQL backend with Alembic migrations, soft deletes, and comprehensive audit trails
+    </Card>
+    <Card title="Security Built-in" icon="shield" href="/environment-setup">
+      CSRF protection with Flask-WTF, secure environment configuration, and validation
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Explore by Topic
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Find what you need to build with the Furniture Store Backend
+  </p>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a href="/architecture" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#8B4513] dark:hover:border-[#D2691E] transition-colors">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#8B4513] dark:group-hover:text-[#D2691E] transition-colors">
+          Architecture Overview
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Learn about the layered MVC architecture and how the components work together
+        </p>
+        <div className="flex items-center gap-1 text-[#8B4513] dark:text-[#D2691E] text-sm font-medium">
+          <span>Read more</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/api/catalogs/colors" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#8B4513] dark:hover:border-[#D2691E] transition-colors">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#8B4513] dark:group-hover:text-[#D2691E] transition-colors">
+          Catalog Endpoints
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Complete API reference for managing colors, wood types, furniture types, and more
+        </p>
+        <div className="flex items-center gap-1 text-[#8B4513] dark:text-[#D2691E] text-sm font-medium">
+          <span>Explore API</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/database-models" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#8B4513] dark:hover:border-[#D2691E] transition-colors">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#8B4513] dark:group-hover:text-[#D2691E] transition-colors">
+          Database Models
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Understand the database schema and SQLAlchemy model definitions
+        </p>
+        <div className="flex items-center gap-1 text-[#8B4513] dark:text-[#D2691E] text-sm font-medium">
+          <span>View models</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/development/project-structure" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#8B4513] dark:hover:border-[#D2691E] transition-colors">
+      <div className="p-6 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-[#8B4513] dark:group-hover:text-[#D2691E] transition-colors">
+          Project Structure
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Navigate the codebase organization and understand where everything lives
+        </p>
+        <div className="flex items-center gap-1 text-[#8B4513] dark:text-[#D2691E] text-sm font-medium">
+          <span>Learn structure</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-br from-[#8B4513] to-[#D2691E] dark:from-[#5C2E0A] dark:to-[#8B4513] p-8 md:p-12">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      Ready to get started?
+    </h2>
+    <p className="text-lg text-white/90 mb-6 max-w-2xl">
+      Follow our quickstart guide to set up the Furniture Store Backend and start managing your manufacturing operations.
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#8B4513] font-semibold hover:bg-white/90 transition-colors no-underline"
+    >
+      View Quickstart Guide
+    </a>
+  </div>
+</div>

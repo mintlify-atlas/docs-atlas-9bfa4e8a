@@ -1,0 +1,699 @@
+---
+title: 'Adding New Catalog Modules'
+description: 'Step-by-step guide to create a new catalog module following project patterns'
+---
+
+This guide walks you through creating a new catalog module in the Furniture Store Backend. We'll use the existing `colors` module as a reference pattern.
+
+## Overview
+
+Adding a new catalog module involves:
+
+1. Creating a database model
+2. Generating a database migration
+3. Creating the service layer
+4. Creating WTForms forms
+5. Creating route handlers
+6. Creating templates
+7. Registering the blueprint
+
+## Example: Creating a "Materials" Catalog
+
+Let's create a new catalog to manage furniture materials (leather, fabric, metal, etc.).
+
+## Step 1: Create the Model
+
+Create `app/models/material.py`:
+
+```python
+from sqlalchemy.sql import func
+from ..extensions import db
+
+
+class Material(db.Model):
+    """
+    Modelo de Material para el catálogo de materiales de muebles.
+
+    Attributes:
+        id_material: Identificador único del material
+        name: Nombre del material (ej. 'Cuero', 'Tela', 'Metal')
+        description: Descripción opcional del material
+        active: Indica si el material está activo
+        created_at: Fecha de creación
+        updated_at: Fecha de última actualización
+        deleted_at: Fecha de eliminación lógica
+    """
+
+    __tablename__ = 'materials'
+
+    id_material = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    description = db.Column(db.String(200), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+
+    def to_dict(self) -> dict:
+        """
+        Serializa el modelo a diccionario.
+
+        Returns:
+            dict: Representación del material en formato diccionario
+        """
+        return {
+            "id_material": self.id_material,
+            "name": self.name,
+            "description": self.description,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+**Key patterns from `app/models/color.py:6-61`:**
+- Use singular PascalCase for class name
+- Use plural snake_case for `__tablename__`
+- Include all audit fields (created_at, updated_at, deleted_at, created_by, etc.)
+- Add `to_dict()` method for serialization
+- Use `func.current_timestamp()` for timestamp defaults
+
+### Register the Model
+
+Add to `app/models/__init__.py`:
+
+```python
+from .color import Color
+from .role import Role
+from .wood_type import WoodType 
+from .unit_of_measure import UnitOfMeasure
+from .furniture_type import FurnitureType
+from .material import Material  # Add this line
+```
+
+## Step 2: Create Database Migration
+
+Generate and apply the migration:
+
+```bash
+flask db migrate -m "add materials table"
+flask db upgrade
+```
+
+This creates a new file in `migrations/versions/` with the table schema.
+
+**Review the generated migration** to ensure it matches your model definition.
+
+## Step 3: Create the Service Layer
+
+Create `app/catalogs/materials/services.py`:
+
+```python
+"""
+Servicios de lógica de negocio para materiales.
+"""
+
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+
+from app.exceptions import ConflictError, ValidationError, NotFoundError
+from app.extensions import db
+from app.models.material import Material
+
+
+class MaterialService:
+    """Servicio para operaciones de negocio relacionadas con materiales."""
+
+    @staticmethod
+    def get_all() -> list[Material]:
+        """
+        Obtiene todos los materiales activos.
+
+        Returns:
+            list[Material]: Lista de objetos Material activos
+        """
+        return Material.query.filter_by(active=True).all()
+
+    @staticmethod
+    def create(data: dict) -> dict:
+        """
+        Crea un nuevo material en el catálogo.
+
+        Args:
+            data: Diccionario con los datos del material (name requerido)
+
+        Returns:
+            dict: Material creado serializado
+
+        Raises:
+            ValidationError: Si el nombre está vacío
+            ConflictError: Si ya existe un material con el mismo nombre
+        """
+        name = data.get("name")
+
+        if not name or not name.strip():
+            raise ValidationError("El nombre del material es requerido")
+
+        name = name.strip()
+        description = data.get("description", "").strip() or None
+
+        existing = Material.query.filter(
+            func.lower(Material.name) == name.lower()
+        ).first()
+        if existing:
+            raise ConflictError(f"Ya existe un material con el nombre '{name}'")
+
+        material = Material(name=name, description=description)
+        db.session.add(material)
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe un material con el nombre '{name}'")
+
+        return material.to_dict()
+
+    @staticmethod
+    def get_by_id(id_material: int) -> Material:
+        """
+        Obtiene un material por su ID.
+
+        Args:
+            id_material: Identificador del material
+
+        Returns:
+            Material: Objeto Material correspondiente al ID
+
+        Raises:
+            NotFoundError: Si no se encuentra el material
+        """
+        material = Material.query.get(id_material)
+
+        if not material:
+            raise NotFoundError(f"No se encontró un material con ID {id_material}")
+        return material
+
+    @staticmethod
+    def update(id_material: int, data: dict) -> dict:
+        """
+        Actualiza un material existente.
+
+        Args:
+            id_material: Identificador del material
+            data: Diccionario con los datos actualizados
+
+        Returns:
+            dict: Material actualizado serializado
+
+        Raises:
+            NotFoundError: Si no se encuentra el material
+            ValidationError: Si el nombre está vacío
+            ConflictError: Si ya existe otro material con el mismo nombre
+        """
+        material = MaterialService.get_by_id(id_material)
+
+        name = data.get("name")
+        if not name or not name.strip():
+            raise ValidationError("El nombre del material es requerido")
+
+        name = name.strip()
+        description = data.get("description", "").strip() or None
+
+        existing = (
+            db.session.query(Material.id_material)
+            .filter(
+                func.lower(Material.name) == name.lower(),
+                Material.id_material != id_material
+            )
+            .first()
+            is not None
+        )
+
+        if existing:
+            raise ConflictError(f"Ya existe otro material con el nombre '{name}'")
+
+        material.name = name
+        material.description = description
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe otro material con el nombre '{name}'")
+
+        return material.to_dict()
+
+    @staticmethod
+    def delete(id_material: int) -> None:
+        """
+        Elimina (lógicamente) un material.
+
+        Args:
+            id_material: Identificador del material
+
+        Raises:
+            NotFoundError: Si no se encuentra el material
+        """
+        material = MaterialService.get_by_id(id_material)
+
+        material.active = False
+        material.deleted_at = func.current_timestamp()
+
+        db.session.commit()
+```
+
+**Key patterns from `app/catalogs/colors/services.py`:**
+- Use static methods in service classes
+- Validate input and raise custom exceptions
+- Use case-insensitive queries with `func.lower()`
+- Wrap `db.session.commit()` in try-except for `IntegrityError`
+- Implement soft deletes by setting `active=False`
+
+## Step 4: Create Forms
+
+Create `app/catalogs/materials/forms.py`:
+
+```python
+"""
+Formularios para el módulo de materiales.
+"""
+
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
+
+
+class MaterialForm(FlaskForm):
+    """Formulario para crear/editar un material."""
+
+    name = StringField(
+        "Nombre",
+        validators=[
+            DataRequired(message="El nombre del material es requerido"),
+            Length(max=50, message="El nombre no puede exceder 50 caracteres"),
+        ],
+    )
+
+    description = TextAreaField(
+        "Descripción",
+        validators=[
+            Optional(),
+            Length(max=200, message="La descripción no puede exceder 200 caracteres"),
+        ],
+    )
+```
+
+**Pattern from `app/catalogs/colors/forms.py:1-20`:**
+- Extend `FlaskForm`
+- Add validators to each field
+- Use descriptive error messages in Spanish
+
+## Step 5: Create Routes
+
+Create `app/catalogs/materials/routes.py`:
+
+```python
+"""
+Rutas/Endpoints para el módulo de materiales.
+"""
+
+from flask import flash, redirect, render_template, request, url_for
+
+from app.exceptions import ConflictError, NotFoundError, ValidationError
+from . import materials_bp
+from .forms import MaterialForm
+from .services import MaterialService
+
+
+@materials_bp.route("/", methods=["GET"])
+def list_materials():
+    """
+    Muestra la lista de materiales del catálogo.
+
+    Returns:
+        HTML: Página con la lista de materiales
+    """
+    materials = MaterialService.get_all()
+    return render_template("materials/list.html", materials=materials)
+
+
+@materials_bp.route("/create", methods=["GET", "POST"])
+def create_material():
+    """
+    Muestra el formulario y crea un nuevo material.
+
+    GET: Renderiza el formulario de creación.
+    POST: Valida el formulario, crea el material y redirige.
+
+    Returns:
+        GET - HTML: Página con el formulario
+        POST - Redirect: Redirige con mensaje flash
+    """
+    form = MaterialForm()
+
+    if form.validate_on_submit():
+        data = {
+            "name": form.name.data,
+            "description": form.description.data,
+        }
+        try:
+            MaterialService.create(data)
+            flash("Material creado exitosamente", "success")
+            return redirect(url_for("materials.create_material"))
+        except ConflictError as e:
+            flash(e.message, "error")
+
+    return render_template("materials/create.html", form=form)
+
+
+@materials_bp.route("/<int:id_material>/edit", methods=["GET", "POST"])
+def edit_material(id_material: int):
+    """
+    Muestra el formulario y actualiza un material existente.
+
+    GET: Renderiza el formulario con los datos actuales.
+    POST: Valida el formulario, actualiza el material y redirige.
+
+    Returns:
+        GET - HTML: Página con el formulario de edición
+        POST - Redirect: Redirige con mensaje flash
+    """
+    try:
+        material = MaterialService.get_by_id(id_material)
+    except NotFoundError as e:
+        flash(e.message, "error")
+        return redirect(url_for("materials.list_materials"))
+
+    form = MaterialForm()
+
+    if form.validate_on_submit():
+        data = {
+            "name": form.name.data,
+            "description": form.description.data,
+        }
+        try:
+            MaterialService.update(id_material, data)
+            flash("Material actualizado exitosamente", "success")
+            return redirect(url_for("materials.list_materials"))
+        except (ConflictError, ValidationError) as e:
+            flash(e.message, "error")
+
+    elif request.method == "GET":
+        # Pre-poblar el formulario
+        form.name.data = material.name
+        form.description.data = material.description
+
+    return render_template("materials/edit.html", form=form, material=material)
+
+
+@materials_bp.route("/<int:id_material>/delete", methods=["POST"])
+def delete_material(id_material: int):
+    """
+    Ejecuta la eliminación lógica de un material.
+
+    Returns:
+        Redirect: Redirige a la lista con mensaje flash
+    """
+    try:
+        MaterialService.delete(id_material)
+        flash("Material eliminado exitosamente", "success")
+    except NotFoundError as e:
+        flash(e.message, "error")
+
+    return redirect(url_for("materials.list_materials"))
+```
+
+**Patterns from `app/catalogs/colors/routes.py:1-107`:**
+- Separate GET and POST logic
+- Use try-except to catch service exceptions
+- Always use flash messages for user feedback
+- Redirect after successful POST (PRG pattern)
+- Pre-populate forms on GET for edit routes
+
+## Step 6: Create Blueprint
+
+Create `app/catalogs/materials/__init__.py`:
+
+```python
+"""
+Módulo de gestión de materiales.
+
+Proporciona endpoints para CRUD de materiales del catálogo.
+"""
+
+from flask import Blueprint
+
+materials_bp = Blueprint('materials', __name__)
+
+from . import routes  # noqa: E402, F401
+```
+
+**Pattern from `app/catalogs/colors/__init__.py:1-12`**
+
+## Step 7: Register Blueprint
+
+Edit `app/__init__.py` to register the new blueprint:
+
+```python
+def create_app():
+    # ... existing code ...
+    
+    # Register blueprints
+    from .catalogs.colors import colors_bp
+    app.register_blueprint(colors_bp, url_prefix='/colors')
+    
+    from .catalogs.roles import roles_bp
+    app.register_blueprint(roles_bp, url_prefix='/roles')
+
+    from .catalogs.wood_types import woods_types_bp
+    app.register_blueprint(woods_types_bp, url_prefix='/wood-types')
+
+    from .catalogs.unit_of_measures import unit_of_measures_bp
+    app.register_blueprint(unit_of_measures_bp, url_prefix='/unit-of-measures')
+    
+    # Add this:
+    from .catalogs.materials import materials_bp
+    app.register_blueprint(materials_bp, url_prefix='/materials')
+
+    return app
+```
+
+From `app/__init__.py:36-46`
+
+## Step 8: Create Templates
+
+Create the template directory:
+
+```bash
+mkdir -p app/templates/materials
+```
+
+### Create `app/templates/materials/create.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Crear Material - Furniture Store{% endblock %}
+
+{% block content %}
+<h1>Agregar nuevo material</h1>
+
+<form method="POST" action="{{ url_for('materials.create_material') }}">
+    {{ form.hidden_tag() }}
+
+    <div>
+        {{ form.name.label }}
+        {{ form.name(size=30) }}
+        {% for error in form.name.errors %}
+            <p style="color: red;">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div>
+        {{ form.description.label }}
+        {{ form.description(rows=3, cols=50) }}
+        {% for error in form.description.errors %}
+            <p style="color: red;">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <button type="submit">Crear</button>
+</form>
+{% endblock %}
+```
+
+### Create `app/templates/materials/edit.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Editar Material - Furniture Store{% endblock %}
+
+{% block content %}
+<h1>Editar material: {{ material.name }}</h1>
+
+<form method="POST" action="{{ url_for('materials.edit_material', id_material=material.id_material) }}">
+    {{ form.hidden_tag() }}
+
+    <div>
+        {{ form.name.label }}
+        {{ form.name(size=30) }}
+        {% for error in form.name.errors %}
+            <p style="color: red;">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <div>
+        {{ form.description.label }}
+        {{ form.description(rows=3, cols=50) }}
+        {% for error in form.description.errors %}
+            <p style="color: red;">{{ error }}</p>
+        {% endfor %}
+    </div>
+
+    <button type="submit">Actualizar</button>
+    <a href="{{ url_for('materials.list_materials') }}">Cancelar</a>
+</form>
+{% endblock %}
+```
+
+### Create `app/templates/materials/list.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Materiales - Furniture Store{% endblock %}
+
+{% block content %}
+<h1>Lista de Materiales</h1>
+
+<a href="{{ url_for('materials.create_material') }}">Crear nuevo material</a>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Descripción</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for material in materials %}
+        <tr>
+            <td>{{ material.id_material }}</td>
+            <td>{{ material.name }}</td>
+            <td>{{ material.description or '-' }}</td>
+            <td>
+                <a href="{{ url_for('materials.edit_material', id_material=material.id_material) }}">Editar</a>
+                <form method="POST" action="{{ url_for('materials.delete_material', id_material=material.id_material) }}" style="display:inline;">
+                    {{ csrf_token() }}
+                    <button type="submit" onclick="return confirm('¿Está seguro?')">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+```
+
+**Template patterns from `app/templates/colors/create.html:1-20`:**
+- Extend `base.html`
+- Use `form.hidden_tag()` for CSRF protection
+- Display field errors below each field
+- Use `url_for()` for all URLs
+
+## Step 9: Update Navigation (Optional)
+
+Edit `app/templates/base.html` to add navigation links:
+
+```html
+<nav>
+  <!-- existing links -->
+  <a href="{{ url_for('materials.list_materials') }}">Materiales</a> |
+  <a href="{{ url_for('materials.create_material') }}">Crear Material</a> |
+</nav>
+```
+
+## Step 10: Test Your Module
+
+Start the application:
+
+```bash
+python run.py
+```
+
+Visit:
+- `http://localhost:5000/materials/` - List view
+- `http://localhost:5000/materials/create` - Create form
+
+Test all CRUD operations:
+1. Create a new material
+2. View the list
+3. Edit an existing material
+4. Delete a material (soft delete)
+
+## Checklist
+
+Before considering your module complete:
+
+- [ ] Model created with all audit fields
+- [ ] Model registered in `app/models/__init__.py`
+- [ ] Migration generated and applied
+- [ ] Service layer implements: `get_all()`, `create()`, `get_by_id()`, `update()`, `delete()`
+- [ ] Service uses case-insensitive name checking
+- [ ] Service wraps commits in try-except
+- [ ] Forms created with appropriate validators
+- [ ] Routes handle both GET and POST
+- [ ] Routes catch and flash exceptions
+- [ ] Routes implement PRG pattern
+- [ ] Blueprint created and registered
+- [ ] All three templates created (create, edit, list)
+- [ ] Templates include CSRF token
+- [ ] Templates display form errors
+- [ ] Manual testing completed
+- [ ] Navigation updated (optional)
+
+## Common Pitfalls
+
+1. **Forgetting to register the model** - Must import in `app/models/__init__.py`
+2. **Not using case-insensitive queries** - Always use `func.lower()` for name comparisons
+3. **Missing CSRF token** - Every form needs `{{ form.hidden_tag() }}`
+4. **Not handling exceptions** - Always wrap service calls in try-except
+5. **Forgetting PRG pattern** - Always redirect after successful POST
+6. **Skipping soft delete** - Set `active=False` instead of deleting records
+
+## Next Steps
+
+- Add unit tests for your service layer
+- Add integration tests for routes
+- Consider adding search/filter functionality
+- Add pagination for large lists
+- Implement audit trail tracking (created_by, updated_by)
+
+## Reference Files
+
+Use these files as templates:
+
+- Model: `app/models/color.py`
+- Service: `app/catalogs/colors/services.py`
+- Routes: `app/catalogs/colors/routes.py`
+- Forms: `app/catalogs/colors/forms.py`
+- Blueprint: `app/catalogs/colors/__init__.py`
+- Templates: `app/templates/colors/`

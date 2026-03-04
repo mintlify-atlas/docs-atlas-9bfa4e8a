@@ -1,0 +1,530 @@
+---
+title: 'MVC Pattern'
+description: 'Understanding the Model-View-Controller architecture and layered design'
+---
+
+## Overview
+
+The Furniture Store Backend implements a **layered MVC (Model-View-Controller)** architecture with an additional **Service Layer** for business logic. This creates clear separation of concerns and makes the codebase maintainable and testable.
+
+## Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER                       │
+│                                                             │
+│  ┌──────────────┐      ┌──────────────┐                   │
+│  │   Routes     │      │    Forms     │                    │
+│  │ (Controller) │◄────►│ (Validation) │                    │
+│  └──────┬───────┘      └──────────────┘                    │
+└─────────┼───────────────────────────────────────────────────┘
+          │
+          │ Calls service methods
+          │
+┌─────────▼───────────────────────────────────────────────────┐
+│                    BUSINESS LOGIC LAYER                     │
+│                                                             │
+│  ┌──────────────────────────────────────────────┐          │
+│  │              Service Classes                 │          │
+│  │  - Validation logic                          │          │
+│  │  - Business rules                            │          │
+│  │  - Exception handling                        │          │
+│  └──────────────────┬───────────────────────────┘          │
+└─────────────────────┼─────────────────────────────────────┘
+                      │
+                      │ Uses models for data access
+                      │
+┌─────────────────────▼─────────────────────────────────────┐
+│                      DATA ACCESS LAYER                     │
+│                                                            │
+│  ┌──────────────────────────────────────────────┐         │
+│  │              SQLAlchemy Models               │         │
+│  │  - Data structure                            │         │
+│  │  - Database mapping                          │         │
+│  │  - Relationships                             │         │
+│  └──────────────────┬───────────────────────────┘         │
+└─────────────────────┼───────────────────────────────────┘
+                      │
+                      ▼
+              ┌──────────────┐
+              │   Database   │
+              └──────────────┘
+```
+
+## Layer Responsibilities
+
+<AccordionGroup>
+  <Accordion title="Controller Layer (Routes)">
+    **Location**: `app/catalogs/*/routes.py`
+    
+    **Responsibilities**:
+    - Handle HTTP requests and responses
+    - Route URL endpoints to business logic
+    - Render templates with data
+    - Flash messages to users
+    - Redirect after operations (PRG pattern)
+    
+    **Does NOT**:
+    - Contain business logic
+    - Access database directly
+    - Perform validation (beyond form validation)
+  </Accordion>
+
+  <Accordion title="Service Layer (Business Logic)">
+    **Location**: `app/catalogs/*/services.py`
+    
+    **Responsibilities**:
+    - Implement business rules
+    - Perform data validation
+    - Handle database transactions
+    - Raise domain-specific exceptions
+    - Coordinate between models
+    
+    **Does NOT**:
+    - Know about HTTP requests/responses
+    - Render templates
+    - Handle routing
+  </Accordion>
+
+  <Accordion title="Model Layer (Data)">
+    **Location**: `app/models/*.py`
+    
+    **Responsibilities**:
+    - Define database schema
+    - Map to database tables
+    - Define relationships
+    - Provide serialization methods
+    
+    **Does NOT**:
+    - Contain business logic
+    - Perform validation
+    - Handle HTTP concerns
+  </Accordion>
+
+  <Accordion title="Form Layer (Input Validation)">
+    **Location**: `app/catalogs/*/forms.py`
+    
+    **Responsibilities**:
+    - Define form fields
+    - Validate user input
+    - Provide CSRF protection
+    - Display validation errors
+    
+    **Does NOT**:
+    - Contain business logic
+    - Access the database
+    - Handle routing
+  </Accordion>
+</AccordionGroup>
+
+## Complete Example: Colors Module
+
+Let's examine how the layers work together in the colors module.
+
+### 1. Model Layer (Data Structure)
+
+Defines the data structure and database mapping:
+
+```python app/models/color.py
+from sqlalchemy.sql import func
+from ..extensions import db
+
+class Color(db.Model):
+    """Color catalog model"""
+    
+    __tablename__ = 'colors'
+    
+    # Primary key
+    id_color = db.Column(db.Integer, primary_key=True)
+    
+    # Business fields
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Audit trail
+    created_at = db.Column(db.TIMESTAMP, nullable=False, 
+                          server_default=func.current_timestamp())
+    updated_at = db.Column(db.TIMESTAMP, nullable=False,
+                          server_default=func.current_timestamp(),
+                          server_onupdate=func.current_timestamp())
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+    
+    def to_dict(self) -> dict:
+        """Serialize model to dictionary"""
+        return {
+            "id_color": self.id_color,
+            "name": self.name,
+            "active": self.active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+```
+
+<Note>
+The model only defines structure and serialization. No business logic here.
+</Note>
+
+### 2. Service Layer (Business Logic)
+
+Implements business rules and data operations:
+
+```python app/catalogs/colors/services.py
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from app.exceptions import ConflictError, ValidationError, NotFoundError
+from app.extensions import db
+from app.models.color import Color
+
+class ColorService:
+    """Service for color business operations"""
+    
+    @staticmethod
+    def get_all() -> list[Color]:
+        """Get all active colors"""
+        return Color.query.filter_by(active=True).all()
+    
+    @staticmethod
+    def create(data: dict) -> dict:
+        """Create a new color with validation"""
+        name = data.get("name")
+        
+        # Business validation
+        if not name or not name.strip():
+            raise ValidationError("El nombre del color es requerido")
+        
+        name = name.strip()
+        
+        # Check for duplicates (case-insensitive)
+        existing = Color.query.filter(
+            func.lower(Color.name) == name.lower()
+        ).first()
+        
+        if existing:
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+        
+        # Create and persist
+        color = Color(name=name)
+        db.session.add(color)
+        
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+        
+        return color.to_dict()
+    
+    @staticmethod
+    def get_by_id(id_color: int) -> Color:
+        """Get color by ID or raise NotFoundError"""
+        color = Color.query.get(id_color)
+        
+        if not color:
+            raise NotFoundError(f"No se encontró un color con ID {id_color}")
+        
+        return color
+    
+    @staticmethod
+    def update(id_color: int, data: dict) -> dict:
+        """Update existing color"""
+        color = ColorService.get_by_id(id_color)
+        
+        name = data.get("name")
+        if not name or not name.strip():
+            raise ValidationError("El nombre del color es requerido")
+        
+        name = name.strip()
+        
+        # Check for duplicate names (excluding current color)
+        existing = (
+            db.session.query(Color.id_color)
+            .filter(
+                func.lower(Color.name) == name.lower(),
+                Color.id_color != id_color
+            )
+            .first()
+            is not None
+        )
+        
+        if existing:
+            raise ConflictError(f"Ya existe otro color con el nombre '{name}'")
+        
+        color.name = name
+        
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe otro color con el nombre '{name}'")
+        
+        return color.to_dict()
+    
+    @staticmethod
+    def delete(id_color: int) -> None:
+        """Soft delete color"""
+        color = ColorService.get_by_id(id_color)
+        
+        color.active = False
+        color.deleted_at = func.current_timestamp()
+        
+        db.session.commit()
+```
+
+<Note>
+The service layer contains all business logic: validation, duplicate checking, error handling, and database transactions.
+</Note>
+
+### 3. Form Layer (Input Validation)
+
+Defines and validates user input:
+
+```python app/catalogs/colors/forms.py
+from flask_wtf import FlaskForm
+from wtforms import StringField
+from wtforms.validators import DataRequired, Length
+
+class ColorForm(FlaskForm):
+    """Form for creating/editing colors"""
+    
+    name = StringField(
+        "Nombre",
+        validators=[
+            DataRequired(message="El nombre del color es requerido"),
+            Length(max=50, message="El nombre no puede exceder 50 caracteres"),
+        ],
+    )
+```
+
+### 4. Controller Layer (Routes)
+
+Handles HTTP requests and coordinates the flow:
+
+```python app/catalogs/colors/routes.py
+from flask import flash, redirect, render_template, request, url_for
+from app.exceptions import ConflictError, NotFoundError, ValidationError
+from . import colors_bp
+from .forms import ColorForm
+from .services import ColorService
+
+@colors_bp.route("/", methods=["GET"])
+def list_colors():
+    """Display list of colors"""
+    colors = ColorService.get_all()
+    return render_template("colors/list.html", colors=colors)
+
+@colors_bp.route("/create", methods=["GET", "POST"])
+def create_color():
+    """Show form and create new color"""
+    form = ColorForm()
+    
+    if form.validate_on_submit():
+        data = {"name": form.name.data}
+        try:
+            ColorService.create(data)
+            flash("Color creado exitosamente", "success")
+            return redirect(url_for("colors.create_color"))
+        except ConflictError as e:
+            flash(e.message, "error")
+    
+    return render_template("colors/create.html", form=form)
+
+@colors_bp.route("/<int:id_color>/edit", methods=["GET", "POST"])
+def edit_color(id_color: int):
+    """Show form and update existing color"""
+    try:
+        color = ColorService.get_by_id(id_color)
+    except NotFoundError as e:
+        flash(e.message, "error")
+        return redirect(url_for("colors.list_colors"))
+    
+    form = ColorForm()
+    
+    if form.validate_on_submit():
+        data = {"name": form.name.data}
+        try:
+            ColorService.update(id_color, data)
+            flash("Color actualizado exitosamente", "success")
+            return redirect(url_for("colors.list_colors"))
+        except (ConflictError, ValidationError) as e:
+            flash(e.message, "error")
+    
+    elif request.method == "GET":
+        # Pre-populate form on GET requests
+        form.name.data = color.name
+    
+    return render_template("colors/edit.html", form=form, color=color)
+
+@colors_bp.route("/<int:id_color>/delete", methods=["POST"])
+def delete_color(id_color: int):
+    """Soft delete color"""
+    try:
+        ColorService.delete(id_color)
+        flash("Color eliminado exitosamente", "success")
+    except NotFoundError as e:
+        flash(e.message, "error")
+    
+    return redirect(url_for("colors.list_colors"))
+```
+
+<Note>
+The controller only handles HTTP concerns: routing, form handling, template rendering, and redirects. All business logic is delegated to the service.
+</Note>
+
+## Request Flow Example
+
+Let's trace a complete request to create a color:
+
+<Steps>
+  <Step title="User submits form">
+    User fills out the color creation form and submits it:
+    ```
+    POST /colors/create
+    name: "Blue"
+    ```
+  </Step>
+  
+  <Step title="Route handler receives request">
+    `create_color()` route in `routes.py:25` receives the POST request
+  </Step>
+  
+  <Step title="Form validation">
+    Flask-WTF validates the form:
+    - Checks that name is provided (DataRequired)
+    - Checks that name is ≤ 50 characters (Length)
+  </Step>
+  
+  <Step title="Service layer called">
+    If form is valid, controller calls `ColorService.create(data)` at `routes.py:42`
+  </Step>
+  
+  <Step title="Business validation">
+    Service performs business-level validation in `services.py:27-50`:
+    - Trims whitespace
+    - Checks for duplicate names (case-insensitive)
+    - Validates data completeness
+  </Step>
+  
+  <Step title="Model creation">
+    Service creates a Color model instance and adds it to the session at `services.py:52`
+  </Step>
+  
+  <Step title="Database commit">
+    Service commits the transaction at `services.py:56`, with error handling
+  </Step>
+  
+  <Step title="Response generation">
+    Controller receives the result:
+    - On success: Flash success message, redirect to form
+    - On error: Flash error message, re-render form
+  </Step>
+</Steps>
+
+## Design Patterns
+
+<CardGroup cols={2}>
+  <Card title="Post-Redirect-Get (PRG)" icon="rotate">
+    After successful POST operations, redirect to prevent duplicate submissions:
+    ```python
+    ColorService.create(data)
+    flash("Color creado exitosamente", "success")
+    return redirect(url_for("colors.create_color"))
+    ```
+  </Card>
+  
+  <Card title="Service Layer Pattern" icon="layer-group">
+    Business logic is centralized in service classes, making it reusable and testable independently of HTTP concerns.
+  </Card>
+  
+  <Card title="Exception-Based Flow" icon="triangle-exclamation">
+    Services raise domain-specific exceptions instead of returning error codes:
+    ```python
+    raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+    ```
+  </Card>
+  
+  <Card title="Static Methods" icon="code">
+    Service methods are static since they don't need instance state:
+    ```python
+    @staticmethod
+    def create(data: dict) -> dict:
+    ```
+  </Card>
+</CardGroup>
+
+## Benefits of Layered Architecture
+
+<AccordionGroup>
+  <Accordion title="Testability">
+    Each layer can be tested independently:
+    - Services can be tested without HTTP requests
+    - Models can be tested without business logic
+    - Controllers can be tested with mocked services
+  </Accordion>
+  
+  <Accordion title="Maintainability">
+    Changes are isolated to specific layers:
+    - Change business logic without touching routes
+    - Modify database schema without changing services
+    - Update UI without affecting business logic
+  </Accordion>
+  
+  <Accordion title="Reusability">
+    Services can be called from different contexts:
+    - Web routes
+    - API endpoints
+    - Background jobs
+    - CLI commands
+  </Accordion>
+  
+  <Accordion title="Clear Contracts">
+    Each layer has a well-defined interface:
+    - Controllers call services
+    - Services use models
+    - Dependencies flow in one direction
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Error Handling
+
+```python
+try:
+    ColorService.create(data)
+    flash("Success message", "success")
+    return redirect(url_for("endpoint"))
+except ConflictError as e:
+    flash(e.message, "error")
+except ValidationError as e:
+    flash(e.message, "error")
+```
+
+### Form Pre-population
+
+```python
+if request.method == "GET":
+    form.name.data = color.name
+```
+
+### Soft Delete
+
+```python
+color.active = False
+color.deleted_at = func.current_timestamp()
+db.session.commit()
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture">
+    Understand the overall system design
+  </Card>
+  <Card title="Database Models" icon="database" href="/database-models">
+    Learn about data structure and relationships
+  </Card>
+</CardGroup>

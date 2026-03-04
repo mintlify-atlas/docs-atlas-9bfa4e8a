@@ -1,0 +1,254 @@
+---
+title: 'Environment Setup'
+description: 'Configure environment variables and application settings for the Furniture Store Backend'
+---
+
+## Overview
+
+The Furniture Store Backend uses environment variables to manage configuration across different environments. All configuration is loaded through the `config.py` module, which reads from a `.env` file using python-dotenv.
+
+## Environment Variables
+
+Create a `.env` file in the project root based on the `.env-template` file:
+
+```bash .env-template
+FLASK_APP=app.py
+FLASK_ENV=development
+
+DB_USER=example_user
+DB_PASSWORD=example_password
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=example_db
+```
+
+### Required Variables
+
+<ParamField path="FLASK_APP" type="string" required>
+  The entry point for the Flask application. Set to `app.py` or `run.py`.
+</ParamField>
+
+<ParamField path="FLASK_ENV" type="string" required>
+  The Flask environment mode. Use `development` for local development or `production` for production deployments.
+  
+  <Warning>Setting `FLASK_ENV=production` requires a valid `SECRET_KEY` to be set.</Warning>
+</ParamField>
+
+<ParamField path="DB_USER" type="string" required>
+  MySQL database username for authentication.
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string" required>
+  MySQL database password for authentication.
+  
+  <Tip>Use strong passwords in production and never commit them to version control.</Tip>
+</ParamField>
+
+<ParamField path="DB_HOST" type="string" required>
+  Database server hostname or IP address. Typically `localhost` for development or a remote host for production.
+</ParamField>
+
+<ParamField path="DB_PORT" type="string" required>
+  MySQL database port. Default is `3306`.
+</ParamField>
+
+<ParamField path="DB_NAME" type="string" required>
+  Name of the database to connect to.
+</ParamField>
+
+<ParamField path="SECRET_KEY" type="string" optional>
+  Secret key for session management and CSRF protection.
+  
+  <Warning>
+    **Production Requirement**: This variable is **required** in production. The application will raise a `ValueError` if `SECRET_KEY` is not set when `FLASK_ENV=production`.
+  </Warning>
+  
+  In development, if not provided, defaults to `"dev-secret-key-change-in-production"`.
+</ParamField>
+
+## Configuration Structure
+
+The `config.py` file defines the `Config` class that loads and manages all configuration settings:
+
+```python config.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+    DB_NAME = os.getenv("DB_NAME")
+
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # SECRET_KEY is required for session management and CSRF protection
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        # Only allow default in development; production must set SECRET_KEY
+        if os.getenv("FLASK_ENV") == "production":
+            raise ValueError("SECRET_KEY must be set in production environment")
+        SECRET_KEY = "dev-secret-key-change-in-production"
+```
+
+### Key Configuration Options
+
+<AccordionGroup>
+  <Accordion title="SQLALCHEMY_DATABASE_URI">
+    Automatically constructed from individual database variables using the format:
+    ```
+    mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}
+    ```
+    
+    This uses the PyMySQL driver for MySQL connectivity.
+  </Accordion>
+
+  <Accordion title="SQLALCHEMY_TRACK_MODIFICATIONS">
+    Set to `False` to disable Flask-SQLAlchemy's event notification system, which adds unnecessary overhead and is not needed for most applications.
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+  **Never commit sensitive credentials to version control**. The `.env` file should be listed in `.gitignore`.
+</Warning>
+
+### SECRET_KEY Generation
+
+For production environments, generate a strong secret key:
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Add this to your `.env` file:
+
+```bash
+SECRET_KEY=your_generated_secret_key_here
+```
+
+### Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Strong Passwords" icon="key">
+    Database passwords should be complex and unique for each environment.
+  </Card>
+  <Card title="Rotate Secrets Regularly" icon="rotate">
+    Change `SECRET_KEY` and database credentials periodically.
+  </Card>
+  <Card title="Environment Isolation" icon="shield">
+    Use different credentials for development, staging, and production.
+  </Card>
+  <Card title="Access Control" icon="lock">
+    Restrict database access to only the application servers that need it.
+  </Card>
+</CardGroup>
+
+## Development vs Production Settings
+
+### Development Configuration
+
+```bash .env
+FLASK_ENV=development
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=dev_user
+DB_PASSWORD=dev_password
+DB_NAME=furniture_store_dev
+# SECRET_KEY can be omitted in development
+```
+
+<Note>
+  In development mode, Flask enables debug mode with automatic reloading and detailed error pages.
+</Note>
+
+### Production Configuration
+
+```bash .env
+FLASK_ENV=production
+DB_HOST=prod-db-server.example.com
+DB_PORT=3306
+DB_USER=prod_user
+DB_PASSWORD=strong_secure_password_here
+DB_NAME=furniture_store_prod
+SECRET_KEY=your_generated_secret_key_here
+```
+
+<Warning>
+  **Production requires**:
+  - A strong, randomly generated `SECRET_KEY`
+  - Secure database credentials
+  - HTTPS/TLS for all connections
+  - Proper firewall and network security
+</Warning>
+
+## Application Initialization
+
+The configuration is loaded during application creation in `app/__init__.py`:
+
+```python app/__init__.py
+from flask import Flask
+from config import Config
+from .extensions import csrf, db, migrate
+
+def create_app():
+    app = Flask(__name__)
+    
+    # Load configuration from Config class
+    app.config.from_object(Config)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    
+    return app
+```
+
+## Verifying Configuration
+
+You can verify your configuration is loaded correctly by running the application:
+
+```bash
+python run.py
+```
+
+The `run.py` script includes a database connection test:
+
+```python run.py
+from app import create_app
+from app.extensions import db
+
+app = create_app()
+
+with app.app_context():
+    try:
+        connection = db.engine.connect()
+        print("Database connection successful!")
+        connection.close()
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+```
+
+<Check>
+  If the configuration is correct, you should see "Database connection successful!" when running the application.
+</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Configuration" icon="database" href="/database-configuration">
+    Learn about MySQL connection setup and SQLAlchemy configuration
+  </Card>
+  <Card title="Migrations" icon="arrows-rotate" href="/migrations">
+    Set up and manage database migrations with Flask-Migrate
+  </Card>
+</CardGroup>

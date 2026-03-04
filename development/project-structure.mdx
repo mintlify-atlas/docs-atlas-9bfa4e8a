@@ -1,0 +1,413 @@
+---
+title: 'Project Structure'
+description: 'Complete directory structure and organization of the Furniture Store Backend'
+---
+
+This page provides a comprehensive overview of the project's directory structure and explains the purpose of each component.
+
+## Directory Tree
+
+```
+furniture-store-backend/
+├── app/
+│   ├── __init__.py              # Application factory
+│   ├── extensions.py            # Flask extensions (db, migrate, csrf)
+│   ├── exceptions.py            # Custom exception classes
+│   ├── catalogs/                # Domain modules (catalog management)
+│   │   ├── colors/
+│   │   │   ├── __init__.py      # Blueprint registration
+│   │   │   ├── routes.py        # Route handlers
+│   │   │   ├── services.py      # Business logic
+│   │   │   └── forms.py         # WTForms definitions
+│   │   ├── roles/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py
+│   │   │   ├── services.py
+│   │   │   └── forms.py
+│   │   ├── wood_types/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py
+│   │   │   ├── services.py
+│   │   │   └── forms.py
+│   │   ├── unit_of_measures/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py
+│   │   │   ├── services.py
+│   │   │   └── forms.py
+│   │   └── furniture_type/
+│   │       ├── __init__.py
+│   │       ├── routes.py
+│   │       ├── services.py
+│   │       └── forms.py
+│   ├── models/
+│   │   ├── __init__.py          # Model exports
+│   │   ├── color.py             # Color model
+│   │   ├── role.py              # Role model
+│   │   ├── wood_type.py         # Wood type model
+│   │   ├── unit_of_measure.py   # Unit of measure model
+│   │   └── furniture_type.py    # Furniture type model
+│   └── templates/
+│       ├── base.html            # Base template
+│       ├── colors/
+│       │   ├── create.html
+│       │   ├── edit.html
+│       │   └── list.html
+│       ├── roles/
+│       │   ├── create.html
+│       │   ├── edit.html
+│       │   └── list.html
+│       ├── wood_types/
+│       │   ├── create.html
+│       │   ├── edit.html
+│       │   └── list.html
+│       ├── unit_of_measures/
+│       │   ├── create.html
+│       │   ├── edit.html
+│       │   └── list.html
+│       ├── furniture_types/
+│       │   ├── create.html
+│       │   ├── edit.html
+│       │   └── list.html
+│       └── errors/
+│           └── error.html       # Generic error template
+├── migrations/
+│   ├── env.py                   # Alembic environment config
+│   └── versions/                # Migration version files
+│       ├── 5aa5020316c5_create_colors_table.py
+│       ├── e57af1e0a8f8_create_roles_table.py
+│       ├── 6067bf0c7322_add_table_wood_types.py
+│       ├── c9f0b720f6c2_add_unit_of_measures_table.py
+│       └── 1114dac3f5e4_agregar_tabla_tipo_de_mueble.py
+├── docs/
+│   ├── ARCHITECTURE.md          # Architecture documentation
+│   ├── CODING_CONVENTIONS.md    # Coding standards
+│   └── GUIDE_MIGRATIONS.md      # Database migration guide
+├── .env-template                # Environment variables template
+├── .gitignore                   # Git ignore rules
+├── .python-version              # Python version specification
+├── config.py                    # Application configuration
+├── requirements.txt             # Python dependencies
+├── run.py                       # Application entry point
+└── README.md                    # Project documentation
+```
+
+## Core Directories
+
+### `/app`
+
+The main application package containing all application code.
+
+**Key files:**
+- `__init__.py`: Contains the application factory (`create_app()`) that initializes Flask, extensions, and blueprints
+- `extensions.py`: Initializes Flask extensions (SQLAlchemy, Flask-Migrate, CSRF Protection)
+- `exceptions.py`: Defines custom exception classes and error handlers
+
+Example from `app/__init__.py:8-48`:
+
+```python
+def create_app():
+    """
+    Factory de la aplicación Flask.
+
+    Crea y configura la instancia de la aplicación Flask,
+    inicializa extensiones y registra blueprints.
+    """
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    
+    # Import models
+    from . import models
+    
+    # Register error handlers
+    register_error_handlers(app)
+    
+    # Register blueprints
+    from .catalogs.colors import colors_bp
+    app.register_blueprint(colors_bp, url_prefix='/colors')
+    
+    return app
+```
+
+### `/app/catalogs`
+
+Contains domain-specific catalog modules. Each catalog follows the same structure:
+
+```
+catalog_name/
+├── __init__.py      # Blueprint definition and registration
+├── routes.py        # HTTP route handlers (controllers)
+├── services.py      # Business logic layer
+└── forms.py         # WTForms form definitions
+```
+
+**Current catalogs:**
+- `colors/` - Color catalog management
+- `roles/` - User role management
+- `wood_types/` - Wood type catalog
+- `unit_of_measures/` - Unit of measure catalog
+- `furniture_type/` - Furniture type catalog
+
+Each catalog is registered as a Flask Blueprint with its own URL prefix:
+
+```python
+# From app/__init__.py:36-46
+app.register_blueprint(colors_bp, url_prefix='/colors')
+app.register_blueprint(roles_bp, url_prefix='/roles')
+app.register_blueprint(woods_types_bp, url_prefix='/wood-types')
+app.register_blueprint(unit_of_measures_bp, url_prefix='/unit-of-measures')
+```
+
+### `/app/models`
+
+Contains SQLAlchemy model definitions. Each model represents a database table.
+
+**Files:**
+- `__init__.py` - Exports all models for easy import
+- `color.py` - Color model
+- `role.py` - Role model
+- `wood_type.py` - Wood type model
+- `unit_of_measure.py` - Unit of measure model
+- `furniture_type.py` - Furniture type model
+
+All models follow a consistent structure with audit fields:
+
+```python
+class Color(db.Model):
+    __tablename__ = 'colors'
+    
+    id_color = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Audit fields
+    created_at = db.Column(db.TIMESTAMP, server_default=func.current_timestamp())
+    updated_at = db.Column(db.TIMESTAMP, server_onupdate=func.current_timestamp())
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+    
+    created_by = db.Column(db.String(100), nullable=True)
+    updated_by = db.Column(db.String(100), nullable=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
+```
+
+From `app/models/color.py:6-46`
+
+### `/app/templates`
+
+Contains Jinja2 HTML templates organized by module.
+
+**Structure:**
+- `base.html` - Base template with navigation and flash message handling
+- `{module}/` - Templates for each catalog module
+  - `create.html` - Creation form
+  - `edit.html` - Edit form
+  - `list.html` - List view
+- `errors/error.html` - Generic error page
+
+All templates extend `base.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Crear Color - Furniture Store{% endblock %}
+
+{% block content %}
+<h1>Agregar nuevo color</h1>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <!-- form fields -->
+</form>
+{% endblock %}
+```
+
+### `/migrations`
+
+Database migration files managed by Flask-Migrate (Alembic).
+
+**Structure:**
+- `env.py` - Alembic environment configuration
+- `versions/` - Individual migration files with timestamps
+
+**Example migration files:**
+- `5aa5020316c5_create_colors_table.py`
+- `e57af1e0a8f8_create_roles_table.py`
+- `6067bf0c7322_add_table_wood_types.py`
+
+Migrations are automatically generated with:
+
+```bash
+flask db migrate -m "description of change"
+flask db upgrade
+```
+
+### `/docs`
+
+Project documentation in Markdown format.
+
+**Files:**
+- `ARCHITECTURE.md` - System architecture and design decisions
+- `CODING_CONVENTIONS.md` - Code style and conventions guide
+- `GUIDE_MIGRATIONS.md` - Database migration workflow and best practices
+
+## Configuration Files
+
+### `config.py`
+
+Application configuration class that loads settings from environment variables:
+
+```python
+class Config:
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+    DB_NAME = os.getenv("DB_NAME")
+
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.getenv("SECRET_KEY")
+```
+
+From `config.py:8-23`
+
+### `.env-template`
+
+Template for environment variables. Copy to `.env` and fill in values:
+
+```
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=furniture_store
+SECRET_KEY=your-secret-key-here
+```
+
+### `requirements.txt`
+
+Python package dependencies:
+
+```
+Flask==3.1.2
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.1.0
+Flask-WTF==1.2.2
+PyMySQL==1.1.2
+black==26.1.0
+python-dotenv==1.2.1
+# ... more dependencies
+```
+
+### `run.py`
+
+Application entry point:
+
+```python
+from app import create_app
+from app.extensions import db
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+From `run.py:1-16`
+
+## Module Organization Pattern
+
+Each catalog module follows a consistent 4-layer architecture:
+
+### 1. Blueprint (`__init__.py`)
+
+Defines and exports the Flask Blueprint:
+
+```python
+from flask import Blueprint
+
+colors_bp = Blueprint('colors', __name__)
+
+from . import routes  # noqa: E402, F401
+```
+
+### 2. Routes (`routes.py`)
+
+HTTP endpoint handlers (controllers):
+
+```python
+@colors_bp.route("/create", methods=["GET", "POST"])
+def create_color():
+    form = ColorForm()
+    if form.validate_on_submit():
+        ColorService.create({"name": form.name.data})
+        flash("Color creado exitosamente", "success")
+        return redirect(url_for("colors.create_color"))
+    return render_template("colors/create.html", form=form)
+```
+
+### 3. Services (`services.py`)
+
+Business logic layer:
+
+```python
+class ColorService:
+    @staticmethod
+    def create(data: dict) -> dict:
+        """Creates a new color with validation and duplicate checking."""
+        name = data.get("name").strip()
+        
+        existing = Color.query.filter(
+            func.lower(Color.name) == name.lower()
+        ).first()
+        if existing:
+            raise ConflictError(f"Color '{name}' already exists")
+        
+        color = Color(name=name)
+        db.session.add(color)
+        db.session.commit()
+        return color.to_dict()
+```
+
+### 4. Forms (`forms.py`)
+
+WTForms form definitions with validators:
+
+```python
+class ColorForm(FlaskForm):
+    name = StringField(
+        "Nombre",
+        validators=[
+            DataRequired(message="El nombre del color es requerido"),
+            Length(max=50, message="Máximo 50 caracteres"),
+        ],
+    )
+```
+
+## Extensions
+
+Flask extensions are initialized in `app/extensions.py:1-8`:
+
+```python
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
+
+db = SQLAlchemy()
+migrate = Migrate()
+csrf = CSRFProtect()
+```
+
+These are initialized with the app in the application factory.
+
+## Next Steps
+
+- Learn about [Coding Conventions](/development/coding-conventions)
+- Follow the guide for [Adding New Modules](/development/adding-modules)
+- Review [Database Migrations](~/workspace/source/docs/GUIDE_MIGRATIONS.md)

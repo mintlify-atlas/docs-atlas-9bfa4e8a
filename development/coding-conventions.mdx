@@ -1,0 +1,418 @@
+---
+title: 'Coding Conventions'
+description: 'Code style guidelines and conventions for the Furniture Store Backend project'
+---
+
+This document establishes the coding conventions for the **Furniture Store Backend** project. Following these standards ensures consistency and maintainability across the codebase.
+
+## Python Style Guide
+
+The project follows **PEP 8** as the base style guide and uses **Black** as the automatic code formatter.
+
+### Black Configuration
+
+```bash
+# Format code
+black .
+
+# Check style without modifying
+black --check .
+```
+
+Configuration settings:
+- Line length: 100 characters
+- Target version: Python 3.10+
+- Excludes: `.git`, `.venv`, `venv`, `__pycache__`, `migrations`
+
+## Naming Conventions
+
+### Files and Directories
+
+| Type | Convention | Example |
+|------|------------|----------|
+| Python modules | snake_case | `user_service.py` |
+| Directories | snake_case | `wood_types/` |
+| Classes | PascalCase | `ColorService` |
+
+### Variables and Functions
+
+| Type | Convention | Example |
+|------|------------|----------|
+| Variables | snake_case | `user_name` |
+| Functions | snake_case | `get_all_colors()` |
+| Constants | UPPER_SNAKE_CASE | `MAX_PAGE_SIZE` |
+| Classes | PascalCase | `ColorModel` |
+| Private methods | _snake_case | `_validate_input()` |
+
+### Database Models
+
+Model classes use PascalCase, table names use plural snake_case:
+
+```python
+class Color(db.Model):
+    """
+    Modelo de Color para el catálogo.
+    
+    Attributes:
+        id_color: Identificador único del color
+        name: Nombre del color
+        active: Estado activo/inactivo
+        created_at: Fecha de creación
+        updated_at: Fecha de última actualización
+        deleted_at: Fecha de eliminación lógica
+    """
+    __tablename__ = 'colors'  # Plural, snake_case
+
+    id_color = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    
+    created_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp()
+    )
+    updated_at = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp()
+    )
+    deleted_at = db.Column(db.TIMESTAMP, nullable=True)
+```
+
+See the full Color model in `app/models/color.py:6`
+
+## Import Organization
+
+Imports should be organized in three groups, separated by blank lines:
+
+1. Python standard library
+2. Third-party libraries
+3. Local application imports
+
+```python
+# 1. Standard library
+from datetime import datetime
+from typing import List, Optional
+
+# 2. Third-party libraries
+from flask import Blueprint, flash, redirect, render_template, url_for
+from flask_wtf import FlaskForm
+from wtforms import StringField
+from wtforms.validators import DataRequired
+from sqlalchemy import func
+
+# 3. Local imports
+from app.extensions import db, csrf
+from app.models.color import Color
+from app.exceptions import ConflictError
+```
+
+Example from `app/catalogs/colors/routes.py:1-10`
+
+## Documentation Standards
+
+### Docstrings
+
+Use **Google Style** docstrings for all modules, classes, and functions:
+
+```python
+def create_color(name: str, hex_code: Optional[str] = None) -> dict:
+    """
+    Crea un nuevo color en el catálogo.
+    
+    Args:
+        name: Nombre del color (requerido)
+        hex_code: Código hexadecimal del color (opcional)
+        
+    Returns:
+        dict: Color creado serializado
+        
+    Raises:
+        ValidationError: Si el nombre está vacío
+        ConflictError: Si el color ya existe
+        
+    Example:
+        >>> create_color("Rojo", "#FF0000")
+        {'id': 1, 'name': 'Rojo', 'hex_code': '#FF0000'}
+    """
+    pass
+```
+
+### Type Hints
+
+Always use type hints for function parameters and return values:
+
+```python
+from typing import List, Optional, Dict, Any
+
+def get_colors_by_status(is_active: bool = True) -> List[Color]:
+    """Obtiene colores filtrados por estado."""
+    return Color.query.filter_by(active=is_active).all()
+
+def find_color(color_id: int) -> Optional[Color]:
+    """Busca un color, retorna None si no existe."""
+    return Color.query.get(color_id)
+```
+
+See `app/catalogs/colors/services.py:17-24` for examples.
+
+## Flask Patterns
+
+### Blueprint Structure
+
+Each module defines a Blueprint in its `__init__.py`:
+
+```python
+"""
+Módulo de gestión de colores.
+
+Proporciona endpoints para CRUD de colores del catálogo.
+"""
+
+from flask import Blueprint
+
+colors_bp = Blueprint('colors', __name__)
+
+from . import routes  # noqa: E402, F401
+```
+
+From `app/catalogs/colors/__init__.py:1-12`
+
+### Route Handlers
+
+Route handlers follow these conventions:
+
+```python
+@colors_bp.route("/create", methods=["GET", "POST"])
+def create_color():
+    """
+    Muestra el formulario y crea un nuevo color.
+
+    GET: Renderiza el formulario de creación.
+    POST: Valida el formulario, crea el color y redirige.
+
+    Returns:
+        GET - HTML: Página con el formulario
+        POST - Redirect: Redirige con mensaje flash
+    """
+    form = ColorForm()
+
+    if form.validate_on_submit():
+        data = {"name": form.name.data}
+        try:
+            ColorService.create(data)
+            flash("Color creado exitosamente", "success")
+            return redirect(url_for("colors.create_color"))
+        except ConflictError as e:
+            flash(e.message, "error")
+
+    return render_template("colors/create.html", form=form)
+```
+
+From `app/catalogs/colors/routes.py:25-48`
+
+### POST/Redirect/GET Pattern
+
+Always redirect after a successful POST to prevent duplicate submissions:
+
+```python
+if form.validate_on_submit():
+    ColorService.create(data)
+    flash("Color creado exitosamente", "success")
+    return redirect(url_for("colors.create_color"))  # PRG pattern
+```
+
+## SQLAlchemy Conventions
+
+### Service Layer Pattern
+
+Business logic lives in Service classes with static methods:
+
+```python
+class ColorService:
+    """Servicio para operaciones de negocio relacionadas con colores."""
+
+    @staticmethod
+    def create(data: dict) -> dict:
+        """
+        Crea un nuevo color.
+        
+        Args:
+            data: Diccionario con los datos del color
+            
+        Returns:
+            dict: Color creado serializado
+            
+        Raises:
+            ValidationError: Si el nombre está vacío
+            ConflictError: Si el color ya existe
+        """
+        name = data.get("name")
+        if not name or not name.strip():
+            raise ValidationError("El nombre del color es requerido")
+
+        name = name.strip()
+
+        existing = Color.query.filter(
+            func.lower(Color.name) == name.lower()
+        ).first()
+        if existing:
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+        color = Color(name=name)
+        db.session.add(color)
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+
+        return color.to_dict()
+```
+
+From `app/catalogs/colors/services.py:27-61`
+
+### Case-Insensitive Queries
+
+Use `func.lower()` for case-insensitive string comparisons:
+
+```python
+existing = Color.query.filter(
+    func.lower(Color.name) == name.lower()
+).first()
+```
+
+### Error Handling
+
+Always wrap commits in try-except blocks:
+
+```python
+try:
+    db.session.commit()
+except IntegrityError:
+    db.session.rollback()
+    raise ConflictError("Resource already exists")
+```
+
+## WTForms Conventions
+
+### Form Classes
+
+Form classes extend `FlaskForm` and include field-level validation:
+
+```python
+from flask_wtf import FlaskForm
+from wtforms import StringField
+from wtforms.validators import DataRequired, Length
+
+class ColorForm(FlaskForm):
+    """Formulario para crear un color."""
+
+    name = StringField(
+        "Nombre",
+        validators=[
+            DataRequired(message="El nombre del color es requerido"),
+            Length(max=50, message="El nombre no puede exceder 50 caracteres"),
+        ],
+    )
+```
+
+From `app/catalogs/colors/forms.py:1-20`
+
+### CSRF Protection
+
+All forms must include CSRF token:
+
+```html
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <!-- form fields -->
+</form>
+```
+
+From `app/templates/colors/create.html:9`
+
+## Exception Handling
+
+Use custom exceptions for business logic errors:
+
+```python
+class AppException(Exception):
+    """Excepción base de la aplicación."""
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+
+class ValidationError(AppException):
+    """Excepción para errores de validación."""
+    def __init__(self, message: str = "Datos de entrada inválidos"):
+        super().__init__(message, status_code=400)
+
+class NotFoundError(AppException):
+    """Excepción para recursos no encontrados."""
+    def __init__(self, message: str = "Recurso no encontrado"):
+        super().__init__(message, status_code=404)
+
+class ConflictError(AppException):
+    """Excepción para conflictos (duplicados)."""
+    def __init__(self, message: str = "Conflicto con el recurso existente"):
+        super().__init__(message, status_code=409)
+```
+
+From `app/exceptions.py:12-62`
+
+## Template Conventions
+
+### Template Inheritance
+
+All templates extend `base.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block title %}Crear Color - Furniture Store{% endblock %}
+
+{% block content %}
+<h1>Agregar nuevo color</h1>
+<!-- content -->
+{% endblock %}
+```
+
+### Flash Messages
+
+Display flash messages with categories:
+
+```python
+flash("Color creado exitosamente", "success")
+flash("Error al procesar", "error")
+```
+
+## URL Patterns
+
+| Action | Method | URL Pattern | Example |
+|--------|--------|-------------|----------|
+| List | GET | `/{resource}/` | `/colors/` |
+| Create form | GET | `/{resource}/create` | `/colors/create` |
+| Create | POST | `/{resource}/create` | `/colors/create` |
+| Edit form | GET | `/{resource}/{id}/edit` | `/colors/1/edit` |
+| Update | POST | `/{resource}/{id}/edit` | `/colors/1/edit` |
+| Delete | POST | `/{resource}/{id}/delete` | `/colors/1/delete` |
+
+## Code Review Checklist
+
+- [ ] Code follows PEP 8 (formatted with Black)
+- [ ] All functions have docstrings
+- [ ] Type hints are used
+- [ ] Names follow naming conventions
+- [ ] Exceptions are handled correctly
+- [ ] Forms use `FlaskForm` with validators
+- [ ] Templates include CSRF token via `form.hidden_tag()`
+- [ ] Templates display form errors
+- [ ] PRG pattern applied after POST
+- [ ] No unnecessary commented code
+- [ ] Imports are ordered correctly
+- [ ] Database commits wrapped in try-except
+- [ ] String comparisons are case-insensitive where appropriate

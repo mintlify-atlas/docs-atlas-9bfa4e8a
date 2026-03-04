@@ -1,0 +1,341 @@
+---
+title: "Unit of Measures API"
+description: "API endpoints for managing unit of measure catalog entries"
+---
+
+## Overview
+
+The Unit of Measures API provides endpoints to manage measurement unit catalog entries in the furniture store system. Each unit includes a name, abbreviation, and active status.
+
+**Base URL:** `/unit-of-measures`
+
+## Endpoints
+
+### List Unit of Measures
+
+Retrieve all unit of measures from the catalog.
+
+```http
+GET /unit-of-measures/
+```
+
+#### Response
+
+Returns an HTML page with the list of unit of measures. For API consumption, units are represented as:
+
+<ResponseField name="id_unit_of_measure" type="integer">
+  Unique identifier for the unit of measure
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the unit of measure (max 50 characters)
+</ResponseField>
+
+<ResponseField name="abbreviation" type="string">
+  Abbreviation for the unit (max 10 characters)
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the unit is active
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET http://localhost:5000/unit-of-measures/ \
+  -H "Accept: text/html"
+```
+
+#### Example Response
+
+```json
+[
+  {
+    "id_unit_of_measure": 1,
+    "name": "Centimeter",
+    "abbreviation": "cm",
+    "active": true,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  },
+  {
+    "id_unit_of_measure": 2,
+    "name": "Meter",
+    "abbreviation": "m",
+    "active": true,
+    "created_at": "2024-01-16T14:20:00Z",
+    "updated_at": "2024-01-16T14:20:00Z"
+  },
+  {
+    "id_unit_of_measure": 3,
+    "name": "Inch",
+    "abbreviation": "in",
+    "active": true,
+    "created_at": "2024-01-17T09:15:00Z",
+    "updated_at": "2024-01-17T09:15:00Z"
+  }
+]
+```
+
+---
+
+### Create Unit of Measure
+
+Create a new unit of measure entry in the catalog.
+
+```http
+GET  /unit-of-measures/create
+POST /unit-of-measures/create
+```
+
+**GET** - Displays the creation form
+**POST** - Processes form submission and creates the unit of measure
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Name of the unit of measure
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+<ParamField body="abbreviation" type="string" required>
+  Abbreviation for the unit of measure
+  
+  **Validation:**
+  - Required field
+  - Maximum 10 characters
+  - Must be unique
+</ParamField>
+
+<ParamField body="active" type="boolean">
+  Whether the unit is active
+  
+  **Default:** `true`
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Unidad de medida creada exitosamente"
+- Redirects to `/unit-of-measures/`
+
+**Error Cases:**
+
+<ResponseField name="ConflictError" type="error">
+  Returned when a unit with the same name or abbreviation already exists
+</ResponseField>
+
+<ResponseField name="ValidationError" type="error">
+  Returned when validation rules are violated
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/unit-of-measures/create \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Millimeter" \
+  -d "abbreviation=mm" \
+  -d "active=true" \
+  -d "csrf_token=your_csrf_token"
+```
+
+#### Error Response
+
+```html
+<!-- Flash message displayed -->
+<div class="alert alert-danger">
+  Ya existe una unidad de medida con ese nombre
+</div>
+```
+
+---
+
+### Edit Unit of Measure
+
+Update an existing unit of measure in the catalog.
+
+```http
+GET  /unit-of-measures/<id_unit_of_measure>/edit
+POST /unit-of-measures/<id_unit_of_measure>/edit
+```
+
+**GET** - Displays the edit form pre-populated with current data
+**POST** - Processes form submission and updates the unit of measure
+
+#### Path Parameters
+
+<ParamField path="id_unit_of_measure" type="integer" required>
+  Unique identifier of the unit of measure to edit
+</ParamField>
+
+#### Request Parameters
+
+<ParamField body="name" type="string" required>
+  Updated name for the unit of measure
+  
+  **Validation:**
+  - Required field
+  - Maximum 50 characters
+  - Must be unique
+</ParamField>
+
+<ParamField body="abbreviation" type="string" required>
+  Updated abbreviation for the unit of measure
+  
+  **Validation:**
+  - Required field
+  - Maximum 10 characters
+  - Must be unique
+</ParamField>
+
+<Note>
+  The `active` field is displayed in the GET form (line 97) but not included in the POST update data (lines 83-86). This may be intentional to prevent accidental deactivation.
+</Note>
+
+#### Response
+
+**Success:**
+- Flash message: "Unidad de medida actualizada exitosamente"
+- Redirects to `/unit-of-measures/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the unit ID does not exist
+  
+  Flash message: "Unidad de medida no encontrada"
+  
+  Redirects to `/unit-of-measures/`
+</ResponseField>
+
+<ResponseField name="ConflictError" type="error">
+  Returned when the updated name or abbreviation conflicts with an existing unit
+</ResponseField>
+
+<ResponseField name="ValidationError" type="error">
+  Returned when validation rules are violated
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/unit-of-measures/1/edit \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=Centimetre" \
+  -d "abbreviation=cm" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+### Delete Unit of Measure
+
+Perform logical deletion of a unit of measure (marks as inactive).
+
+```http
+POST /unit-of-measures/<id_unit_of_measure>/delete
+```
+
+#### Path Parameters
+
+<ParamField path="id_unit_of_measure" type="integer" required>
+  Unique identifier of the unit of measure to delete
+</ParamField>
+
+#### Response
+
+**Success:**
+- Flash message: "Unidad de medida eliminada exitosamente"
+- Redirects to `/unit-of-measures/`
+
+**Error Cases:**
+
+<ResponseField name="NotFoundError" type="error">
+  Returned when the unit ID does not exist
+  
+  Flash message: "Unidad de medida no encontrada"
+  
+  Redirects to `/unit-of-measures/`
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:5000/unit-of-measures/1/delete \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrf_token=your_csrf_token"
+```
+
+---
+
+## Data Model
+
+### Unit of Measure Object
+
+```python
+{
+  "id_unit_of_measure": 1,
+  "name": "Centimeter",
+  "abbreviation": "cm",
+  "active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Validation Rules
+
+- **name**: Required, unique, max 50 characters
+- **abbreviation**: Required, unique, max 10 characters
+- **active**: Boolean, defaults to `true`
+- All endpoints require CSRF token for POST requests
+
+## Error Messages
+
+| Error | Message |
+|-------|----------|
+| Missing name | "El nombre de la unidad de medida es requerido" |
+| Name too long | "El nombre no puede exceder 50 caracteres" |
+| Missing abbreviation | "La abreviatura de la unidad de medida es requerida" |
+| Abbreviation too long | "La abreviatura no puede exceder 10 caracteres" |
+| Duplicate name/abbr | Service-specific conflict error |
+| Not found | "Unidad de medida no encontrada" |
+
+## Implementation Details
+
+- **Source:** `app/catalogs/unit_of_measures/routes.py:18-118`
+- **Form:** `app/catalogs/unit_of_measures/forms.py:10-27`
+- **Model:** `app/models/unit_of_measure.py:6-64`
+- **Pattern:** Post-Redirect-Get (PRG) for all form submissions
+- **Deletion:** Logical (soft delete) - sets `active=false` and `deleted_at` timestamp
+- **Note:** Flash messages use "danger" class instead of "error" for consistency with Bootstrap
+
+## Usage Examples
+
+### Common Units
+
+```json
+[
+  {"name": "Centimeter", "abbreviation": "cm"},
+  {"name": "Meter", "abbreviation": "m"},
+  {"name": "Millimeter", "abbreviation": "mm"},
+  {"name": "Inch", "abbreviation": "in"},
+  {"name": "Foot", "abbreviation": "ft"},
+  {"name": "Kilogram", "abbreviation": "kg"},
+  {"name": "Gram", "abbreviation": "g"},
+  {"name": "Pound", "abbreviation": "lb"}
+]
+```

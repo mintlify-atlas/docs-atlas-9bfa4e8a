@@ -1,0 +1,639 @@
+---
+title: 'Database Migrations'
+description: 'Manage database schema changes with Flask-Migrate and Alembic'
+---
+
+## Overview
+
+The Furniture Store Backend uses Flask-Migrate, which wraps Alembic, to manage database schema migrations. This allows you to version control your database schema and apply changes in a controlled, repeatable manner.
+
+## Setup
+
+Flask-Migrate is initialized in the application factory:
+
+```python app/extensions.py
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+migrate = Migrate()
+```
+
+```python app/__init__.py
+from .extensions import db, migrate
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    
+    return app
+```
+
+## Migration Commands
+
+### Initialize Migrations (First Time Only)
+
+If the `migrations/` directory doesn't exist, initialize it:
+
+```bash
+flask db init
+```
+
+This creates the `migrations/` directory structure:
+
+```
+migrations/
+├── alembic.ini
+├── env.py
+├── README
+├── script.py.mako
+└── versions/
+```
+
+<Warning>
+  Only run `flask db init` once when setting up a new project. The `migrations/` directory should be committed to version control.
+</Warning>
+
+### Create a New Migration
+
+After modifying your models, generate a migration:
+
+```bash
+flask db migrate -m "Description of changes"
+```
+
+This command:
+1. Compares your model definitions with the current database schema
+2. Generates a migration script in `migrations/versions/`
+3. Includes both `upgrade()` and `downgrade()` functions
+
+<Tip>
+  Use descriptive migration messages that explain what changed, like:
+  - `"create colors table"`
+  - `"add email field to users"`
+  - `"create index on product name"`
+</Tip>
+
+### Apply Migrations
+
+Apply pending migrations to the database:
+
+```bash
+flask db upgrade
+```
+
+This executes all pending migration scripts in order, updating your database schema.
+
+### Rollback Migrations
+
+Revert the last migration:
+
+```bash
+flask db downgrade
+```
+
+Revert to a specific revision:
+
+```bash
+flask db downgrade <revision_id>
+```
+
+<Warning>
+  Always test rollback procedures in a development environment before using them in production.
+</Warning>
+
+## Migration File Structure
+
+Migration files are stored in `migrations/versions/`. Each file contains:
+
+```python
+"""Description of migration
+
+Revision ID: unique_id
+Revises: previous_revision_id
+Create Date: timestamp
+"""
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic
+revision = 'unique_id'
+down_revision = 'previous_revision_id'
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    # Commands to apply the migration
+    pass
+
+def downgrade():
+    # Commands to revert the migration
+    pass
+```
+
+## Existing Migrations
+
+The project includes the following migrations:
+
+### 1. Create Colors Table
+
+**File**: `migrations/versions/5aa5020316c5_create_colors_table.py`  
+**Revision**: `5aa5020316c5`  
+**Created**: 2026-02-17
+
+```python
+def upgrade():
+    op.create_table('colors',
+        sa.Column('id_color', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=50), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('created_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('deleted_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=True),
+        sa.Column('updated_by', sa.String(length=100), nullable=True),
+        sa.Column('deleted_by', sa.String(length=100), nullable=True),
+        sa.PrimaryKeyConstraint('id_color'),
+        sa.UniqueConstraint('name')
+    )
+```
+
+Creates the `colors` table for storing furniture color options with audit fields.
+
+### 2. Create Roles Table
+
+**File**: `migrations/versions/e57af1e0a8f8_create_roles_table.py`  
+**Revision**: `e57af1e0a8f8`  
+**Revises**: `5aa5020316c5`  
+**Created**: 2026-02-17
+
+```python
+def upgrade():
+    op.create_table('roles',
+        sa.Column('id_role', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=50), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('created_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('deleted_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=True),
+        sa.Column('updated_by', sa.String(length=100), nullable=True),
+        sa.Column('deleted_by', sa.String(length=100), nullable=True),
+        sa.PrimaryKeyConstraint('id_role'),
+        sa.UniqueConstraint('name')
+    )
+```
+
+Creates the `roles` table for user role management.
+
+### 3. Add Wood Types Table
+
+**File**: `migrations/versions/6067bf0c7322_add_table_wood_types.py`  
+**Revision**: `6067bf0c7322`  
+**Revises**: `e57af1e0a8f8`  
+**Created**: 2026-02-18
+
+```python
+def upgrade():
+    op.create_table('wood_types',
+        sa.Column('id_wood_type', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=100), nullable=False),
+        sa.Column('description', sa.String(length=255), nullable=True),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('created_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('deleted_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=True),
+        sa.Column('updated_by', sa.String(length=100), nullable=True),
+        sa.Column('deleted_by', sa.String(length=100), nullable=True),
+        sa.PrimaryKeyConstraint('id_wood_type'),
+        sa.UniqueConstraint('name')
+    )
+```
+
+Creates the `wood_types` table for different types of wood used in furniture.
+
+### 4. Add Unit of Measures Table
+
+**File**: `migrations/versions/c9f0b720f6c2_add_unit_of_measures_table.py`  
+**Revision**: `c9f0b720f6c2`  
+**Revises**: `6067bf0c7322`  
+**Created**: 2026-02-19
+
+```python
+def upgrade():
+    op.create_table('unit_of_measures',
+        sa.Column('id_unit_of_measure', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=50), nullable=False),
+        sa.Column('abbreviation', sa.String(length=10), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('created_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('deleted_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=True),
+        sa.Column('updated_by', sa.String(length=100), nullable=True),
+        sa.Column('deleted_by', sa.String(length=100), nullable=True),
+        sa.PrimaryKeyConstraint('id_unit_of_measure'),
+        sa.UniqueConstraint('abbreviation'),
+        sa.UniqueConstraint('name')
+    )
+```
+
+Creates the `unit_of_measures` table for measurement units (e.g., cm, inch, meter).
+
+### 5. Add Furniture Type Table
+
+**File**: `migrations/versions/1114dac3f5e4_agregar_tabla_tipo_de_mueble.py`  
+**Revision**: `1114dac3f5e4`  
+**Revises**: `c9f0b720f6c2`  
+**Created**: 2026-02-20
+
+```python
+def upgrade():
+    op.create_table('furniture_type',
+        sa.Column('id_furniture_type', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=50), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('created_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.TIMESTAMP(), 
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('deleted_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=True),
+        sa.Column('updated_by', sa.String(length=100), nullable=True),
+        sa.Column('deleted_by', sa.String(length=100), nullable=True),
+        sa.PrimaryKeyConstraint('id_furniture_type'),
+        sa.UniqueConstraint('name')
+    )
+```
+
+Creates the `furniture_type` table for different categories of furniture (e.g., chair, table, desk).
+
+## Migration Workflow
+
+<Steps>
+  <Step title="Modify Models">
+    Update your SQLAlchemy model definitions in `app/models.py`:
+    
+    ```python
+    class Product(db.Model):
+        __tablename__ = 'products'
+        
+        id = db.Column(db.Integer, primary_key=True)
+        name = db.Column(db.String(100), nullable=False)
+        # Add new field
+        sku = db.Column(db.String(50), unique=True, nullable=False)
+    ```
+  </Step>
+  
+  <Step title="Generate Migration">
+    Create a migration script:
+    
+    ```bash
+    flask db migrate -m "add sku field to products"
+    ```
+  </Step>
+  
+  <Step title="Review Migration">
+    Check the generated migration file in `migrations/versions/` to ensure it's correct:
+    
+    ```python
+    def upgrade():
+        op.add_column('products', 
+            sa.Column('sku', sa.String(length=50), nullable=False))
+        op.create_unique_constraint('uq_products_sku', 'products', ['sku'])
+    
+    def downgrade():
+        op.drop_constraint('uq_products_sku', 'products', type_='unique')
+        op.drop_column('products', 'sku')
+    ```
+  </Step>
+  
+  <Step title="Apply Migration">
+    Run the migration:
+    
+    ```bash
+    flask db upgrade
+    ```
+  </Step>
+  
+  <Step title="Verify Changes">
+    Check that the database schema was updated correctly:
+    
+    ```bash
+    flask db current
+    ```
+  </Step>
+</Steps>
+
+## Advanced Migration Operations
+
+### Check Current Revision
+
+View the current migration revision:
+
+```bash
+flask db current
+```
+
+### View Migration History
+
+Show all migrations:
+
+```bash
+flask db history
+```
+
+Show detailed history with ranges:
+
+```bash
+flask db history --verbose
+```
+
+### Upgrade to Specific Revision
+
+Upgrade to a specific revision:
+
+```bash
+flask db upgrade <revision_id>
+```
+
+Upgrade by relative steps:
+
+```bash
+flask db upgrade +2  # Upgrade 2 revisions forward
+```
+
+### Downgrade to Specific Revision
+
+Downgrade to a specific revision:
+
+```bash
+flask db downgrade <revision_id>
+```
+
+Downgrade by relative steps:
+
+```bash
+flask db downgrade -1  # Downgrade 1 revision
+```
+
+### Stamp Database
+
+Mark the database as being at a specific revision without running migrations:
+
+```bash
+flask db stamp <revision_id>
+```
+
+<Warning>
+  Use `stamp` carefully. It updates the migration version without changing the schema.
+</Warning>
+
+## Creating Custom Migrations
+
+Sometimes auto-generated migrations need manual adjustments. You can create an empty migration:
+
+```bash
+flask db revision -m "custom migration"
+```
+
+Then manually edit the migration file:
+
+```python
+def upgrade():
+    # Custom SQL or Alembic operations
+    op.execute("""
+        UPDATE products 
+        SET price = price * 1.1 
+        WHERE category = 'premium'
+    """)
+
+def downgrade():
+    op.execute("""
+        UPDATE products 
+        SET price = price / 1.1 
+        WHERE category = 'premium'
+    """)
+```
+
+## Common Migration Patterns
+
+<AccordionGroup>
+  <Accordion title="Adding a Column">
+    ```python
+    def upgrade():
+        op.add_column('table_name',
+            sa.Column('column_name', sa.String(50), nullable=True))
+    
+    def downgrade():
+        op.drop_column('table_name', 'column_name')
+    ```
+  </Accordion>
+
+  <Accordion title="Removing a Column">
+    ```python
+    def upgrade():
+        op.drop_column('table_name', 'column_name')
+    
+    def downgrade():
+        op.add_column('table_name',
+            sa.Column('column_name', sa.String(50)))
+    ```
+  </Accordion>
+
+  <Accordion title="Adding an Index">
+    ```python
+    def upgrade():
+        op.create_index('idx_products_name', 'products', ['name'])
+    
+    def downgrade():
+        op.drop_index('idx_products_name', 'products')
+    ```
+  </Accordion>
+
+  <Accordion title="Adding a Foreign Key">
+    ```python
+    def upgrade():
+        op.create_foreign_key(
+            'fk_orders_customer',
+            'orders', 'customers',
+            ['customer_id'], ['id']
+        )
+    
+    def downgrade():
+        op.drop_constraint('fk_orders_customer', 'orders', type_='foreignkey')
+    ```
+  </Accordion>
+
+  <Accordion title="Renaming a Column">
+    ```python
+    def upgrade():
+        op.alter_column('table_name', 'old_name', 
+                       new_column_name='new_name')
+    
+    def downgrade():
+        op.alter_column('table_name', 'new_name', 
+                       new_column_name='old_name')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Migration Environment Configuration
+
+The migration environment is configured in `migrations/env.py`:
+
+```python migrations/env.py
+from flask import current_app
+from alembic import context
+
+def get_engine():
+    try:
+        return current_app.extensions['migrate'].db.get_engine()
+    except (TypeError, AttributeError):
+        return current_app.extensions['migrate'].db.engine
+
+def run_migrations_online():
+    connectable = get_engine()
+    
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=get_metadata(),
+            **conf_args
+        )
+        
+        with context.begin_transaction():
+            context.run_migrations()
+```
+
+This configuration:
+- Connects to the database using Flask-SQLAlchemy
+- Provides access to your model metadata for autogeneration
+- Handles both online and offline migration modes
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Review Generated Migrations" icon="eye">
+    Auto-generated migrations may not capture all changes correctly. Always review before applying.
+  </Card>
+  <Card title="Test Migrations" icon="flask">
+    Test both upgrade and downgrade in development before applying to production.
+  </Card>
+  <Card title="Backup Before Migrating" icon="database">
+    Always backup your production database before running migrations.
+  </Card>
+  <Card title="Version Control Migrations" icon="code-branch">
+    Commit migration files to version control to track schema changes.
+  </Card>
+  <Card title="Use Descriptive Messages" icon="message">
+    Write clear migration messages that explain what changed.
+  </Card>
+  <Card title="Handle Data Migrations" icon="table">
+    When changing data types or structure, include data transformation logic.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Migration Already Exists Error">
+    If you see "Target database is not up to date":
+    
+    ```bash
+    # Check current status
+    flask db current
+    
+    # Apply pending migrations
+    flask db upgrade
+    ```
+  </Accordion>
+
+  <Accordion title="No Changes Detected">
+    If `flask db migrate` doesn't detect your model changes:
+    
+    1. Ensure models are imported in `app/__init__.py`
+    2. Check that `db.Model` is used as base class
+    3. Restart Flask application and try again
+    4. Create a manual migration with `flask db revision`
+  </Accordion>
+
+  <Accordion title="Migration Conflicts">
+    If you have conflicting migration branches:
+    
+    ```bash
+    # View branches
+    flask db branches
+    
+    # Merge branches
+    flask db merge -m "merge branches" <rev1> <rev2>
+    ```
+  </Accordion>
+
+  <Accordion title="Rollback Failed">
+    If downgrade fails:
+    
+    1. Check the downgrade() function in the migration file
+    2. Manually fix the database if needed
+    3. Use `flask db stamp` to set the correct revision
+    4. Consider using database backups for recovery
+  </Accordion>
+</AccordionGroup>
+
+## Production Deployment
+
+When deploying to production:
+
+<Steps>
+  <Step title="Backup Database">
+    ```bash
+    mysqldump -u user -p database_name > backup.sql
+    ```
+  </Step>
+  
+  <Step title="Test in Staging">
+    Apply migrations to a staging environment first
+  </Step>
+  
+  <Step title="Schedule Maintenance">
+    Plan for potential downtime during schema changes
+  </Step>
+  
+  <Step title="Apply Migrations">
+    ```bash
+    flask db upgrade
+    ```
+  </Step>
+  
+  <Step title="Verify Application">
+    Test critical functionality after migration
+  </Step>
+</Steps>
+
+<Warning>
+  For large tables, migrations that add columns or indexes can take significant time and may lock tables. Consider using online schema change tools for zero-downtime migrations.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="gear" href="/environment-setup">
+    Configure environment variables and application settings
+  </Card>
+  <Card title="Database Configuration" icon="database" href="/database-configuration">
+    Set up MySQL connections and SQLAlchemy
+  </Card>
+</CardGroup>

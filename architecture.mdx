@@ -1,0 +1,342 @@
+---
+title: 'System Architecture'
+description: 'Overview of the Flask application architecture and component organization'
+---
+
+## Overview
+
+The Furniture Store Backend follows a modular Flask architecture using the **Application Factory Pattern**. The system is organized into logical components with clear separation of concerns, making it maintainable, testable, and scalable.
+
+## Application Factory Pattern
+
+The application uses the factory pattern to create and configure the Flask app instance. This approach provides flexibility for testing and deployment.
+
+### Factory Implementation
+
+The `create_app()` function in `app/__init__.py` serves as the application factory:
+
+```python app/__init__.py
+from flask import Flask
+from config import Config
+from .exceptions import register_error_handlers
+from .extensions import csrf, db, migrate
+
+def create_app():
+    """
+    Factory de la aplicación Flask.
+    
+    Crea y configura la instancia de la aplicación Flask,
+    inicializa extensiones y registra blueprints.
+    """
+    # Create Flask application
+    app = Flask(__name__)
+    
+    # Initialize environment variables
+    app.config.from_object(Config)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    
+    # Import models to register them with SQLAlchemy
+    from . import models
+    
+    # Register error handlers
+    register_error_handlers(app)
+    
+    # Register blueprints
+    from .catalogs.colors import colors_bp
+    app.register_blueprint(colors_bp, url_prefix='/colors')
+    
+    from .catalogs.roles import roles_bp
+    app.register_blueprint(roles_bp, url_prefix='/roles')
+    
+    from .catalogs.wood_types import woods_types_bp
+    app.register_blueprint(woods_types_bp, url_prefix='/wood-types')
+    
+    from .catalogs.unit_of_measures import unit_of_measures_bp
+    app.register_blueprint(unit_of_measures_bp, url_prefix='/unit-of-measures')
+    
+    return app
+```
+
+<Note>
+The factory pattern allows creating multiple app instances with different configurations, which is especially useful for testing and running multiple environments.
+</Note>
+
+## Component Structure
+
+### Directory Organization
+
+```
+app/
+├── __init__.py          # Application factory
+├── extensions.py        # Flask extension instances
+├── exceptions.py        # Custom exception classes
+├── models/              # Database models
+│   ├── __init__.py
+│   ├── color.py
+│   ├── role.py
+│   ├── wood_type.py
+│   ├── unit_of_measure.py
+│   └── furniture_type.py
+├── catalogs/            # Feature modules (blueprints)
+│   ├── colors/
+│   │   ├── __init__.py
+│   │   ├── routes.py
+│   │   ├── services.py
+│   │   └── forms.py
+│   ├── roles/
+│   ├── wood_types/
+│   ├── unit_of_measures/
+│   └── furniture_type/
+└── templates/           # Jinja2 HTML templates
+```
+
+## Extension Initialization
+
+Flask extensions are initialized using the two-phase initialization pattern:
+
+### 1. Extension Declaration
+
+Extensions are instantiated without an app context in `app/extensions.py`:
+
+```python app/extensions.py
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
+
+db = SQLAlchemy()
+migrate = Migrate()
+csrf = CSRFProtect()
+```
+
+### 2. Extension Binding
+
+Extensions are bound to the app instance in the factory:
+
+```python
+db.init_app(app)
+migrate.init_app(app, db)
+csrf.init_app(app)
+```
+
+<Accordion title="Why Two-Phase Initialization?">
+This pattern avoids circular import issues and allows the same extension instances to be used across multiple app instances. Extensions are created once and can be initialized with different app configurations.
+</Accordion>
+
+## Configuration Management
+
+The application uses environment-based configuration through the `Config` class:
+
+```python config.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+    DB_NAME = os.getenv("DB_NAME")
+    
+    SQLALCHEMY_DATABASE_URI = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        if os.getenv("FLASK_ENV") == "production":
+            raise ValueError("SECRET_KEY must be set in production environment")
+        SECRET_KEY = "dev-secret-key-change-in-production"
+```
+
+## Blueprint Registration
+
+The application uses Flask Blueprints to organize features into modules. Each catalog (colors, roles, wood types, etc.) is a separate blueprint.
+
+### Blueprint Structure
+
+Each blueprint follows a consistent structure:
+
+```python app/catalogs/colors/__init__.py
+from flask import Blueprint
+
+colors_bp = Blueprint('colors', __name__)
+
+from . import routes
+```
+
+### Registration in Factory
+
+Blueprints are registered with URL prefixes:
+
+```python
+app.register_blueprint(colors_bp, url_prefix='/colors')
+app.register_blueprint(roles_bp, url_prefix='/roles')
+app.register_blueprint(woods_types_bp, url_prefix='/wood-types')
+```
+
+## Error Handling Architecture
+
+The application implements centralized error handling with custom exceptions:
+
+### Custom Exception Hierarchy
+
+```python app/exceptions.py
+class AppException(Exception):
+    """Base exception class"""
+    def __init__(self, message: str, status_code: int = 500, payload: Optional[dict] = None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.payload = payload
+
+class ValidationError(AppException):
+    """For input validation errors (400)"""
+    def __init__(self, message: str = "Datos de entrada inválidos", payload: Optional[dict] = None):
+        super().__init__(message, status_code=400, payload=payload)
+
+class NotFoundError(AppException):
+    """For resource not found errors (404)"""
+    def __init__(self, message: str = "Recurso no encontrado", payload: Optional[dict] = None):
+        super().__init__(message, status_code=404, payload=payload)
+
+class ConflictError(AppException):
+    """For data conflicts like duplicates (409)"""
+    def __init__(self, message: str = "Conflicto con el recurso existente", payload: Optional[dict] = None):
+        super().__init__(message, status_code=409, payload=payload)
+```
+
+### Global Error Handlers
+
+Error handlers are registered in the factory:
+
+```python
+register_error_handlers(app)
+```
+
+Handlers catch both custom exceptions and standard HTTP errors (400, 404, 405, 500).
+
+## Request Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       HTTP Request                              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │   Flask Application  │
+                  │    (create_app())    │
+                  └──────────┬───────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │   Blueprint Router   │
+                  │  (URL prefix match)  │
+                  └──────────┬───────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │   Route Handler      │
+                  │  (Controller Layer)  │
+                  └──────────┬───────────┘
+                             │
+                  ┌──────────┴───────────┐
+                  │                      │
+                  ▼                      ▼
+          ┌─────────────┐        ┌─────────────┐
+          │    Form     │        │   Service   │
+          │ Validation  │        │    Layer    │
+          └─────────────┘        └──────┬──────┘
+                                        │
+                             ┌──────────┴───────────┐
+                             │                      │
+                             ▼                      ▼
+                  ┌──────────────────┐   ┌──────────────────┐
+                  │   Model Layer    │   │   Exceptions     │
+                  │  (SQLAlchemy)    │   │   (Validation)   │
+                  └────────┬─────────┘   └──────────────────┘
+                           │
+                           ▼
+                  ┌──────────────────┐
+                  │     Database     │
+                  │   (MySQL/Maria)  │
+                  └──────────────────┘
+                           │
+                           ▼
+                  ┌──────────────────┐
+                  │  Template Engine │
+                  │     (Jinja2)     │
+                  └────────┬─────────┘
+                           │
+                           ▼
+                  ┌──────────────────┐
+                  │  HTTP Response   │
+                  └──────────────────┘
+```
+
+## Key Architectural Principles
+
+<AccordionGroup>
+  <Accordion title="Separation of Concerns">
+    Each component has a single, well-defined responsibility:
+    - **Routes**: Handle HTTP requests and responses
+    - **Services**: Implement business logic
+    - **Models**: Represent data structure
+    - **Forms**: Validate user input
+  </Accordion>
+
+  <Accordion title="Modular Design">
+    Features are organized into blueprints that can be:
+    - Developed independently
+    - Tested in isolation
+    - Reused across projects
+    - Enabled/disabled as needed
+  </Accordion>
+
+  <Accordion title="Single Responsibility">
+    Each module, class, and function does one thing well:
+    - Models only define data structure
+    - Services only contain business logic
+    - Routes only handle HTTP concerns
+  </Accordion>
+
+  <Accordion title="Dependency Injection">
+    Dependencies are injected through the factory pattern:
+    - Extensions are initialized once
+    - Configuration is externalized
+    - Easy to mock for testing
+  </Accordion>
+</AccordionGroup>
+
+## Extension Details
+
+<CardGroup cols={3}>
+  <Card title="SQLAlchemy" icon="database">
+    ORM for database operations with model definitions and query building
+  </Card>
+  <Card title="Flask-Migrate" icon="arrows-rotate">
+    Database migration management using Alembic under the hood
+  </Card>
+  <Card title="Flask-WTF" icon="shield-check">
+    Form validation and CSRF protection for secure form handling
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MVC Pattern" icon="layer-group" href="/mvc-pattern">
+    Learn about the layered architecture and request flow
+  </Card>
+  <Card title="Database Models" icon="table" href="/database-models">
+    Explore the data models and relationships
+  </Card>
+</CardGroup>

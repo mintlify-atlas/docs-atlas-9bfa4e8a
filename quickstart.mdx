@@ -1,80 +1,265 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get up and running with the Furniture Store Backend in 5 minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+This guide will walk you through setting up the Furniture Store Backend and making your first API request.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the repository to your local machine:
 
-### Step 1: Set up your local environment
+    ```bash
+    git clone <URL_DEL_REPOSITORIO>
+    cd backend-muebleria
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Set Up Virtual Environment">
+    Create and activate a Python virtual environment:
 
-### Step 2: Deploy your changes
+    <CodeGroup>
+      ```bash Windows
+      python -m venv venv
+      venv\Scripts\activate
+      ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+      ```bash macOS/Linux
+      python -m venv venv
+      source venv/bin/activate
+      ```
+    </CodeGroup>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <Note>
+      When activated successfully, you'll see `(venv)` at the beginning of your terminal prompt.
+    </Note>
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Install Dependencies">
+    Install all required Python packages:
 
-### Step 3: Go live
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    This will install Flask, SQLAlchemy, and all other dependencies including:
+    - Flask 3.1.2
+    - Flask-SQLAlchemy 3.1.1
+    - Flask-Migrate 4.1.0
+    - PyMySQL 1.1.2
+    - Flask-WTF 1.2.2
+  </Step>
 
-## Next steps
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the root directory by copying the template:
 
-Now that you have your docs running, explore these key features:
+    ```bash
+    cp .env-template .env
+    ```
+
+    Update the `.env` file with your database credentials:
+
+    ```bash .env
+    FLASK_APP=app.py
+    FLASK_ENV=development
+
+    DB_USER=your_mysql_user
+    DB_PASSWORD=your_mysql_password
+    DB_HOST=localhost
+    DB_PORT=3306
+    DB_NAME=furniture_store_db
+    ```
+
+    <Warning>
+      Never commit the `.env` file to version control. It contains sensitive credentials.
+    </Warning>
+  </Step>
+
+  <Step title="Create the Database">
+    Create a MySQL database for the application:
+
+    ```sql
+    CREATE DATABASE furniture_store_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+
+    You can run this in your MySQL client or command line:
+
+    ```bash
+    mysql -u root -p -e "CREATE DATABASE furniture_store_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    ```
+  </Step>
+
+  <Step title="Run Database Migrations">
+    Initialize the database schema using Flask-Migrate:
+
+    ```bash
+    flask db upgrade
+    ```
+
+    This will create all necessary tables including:
+    - `colors` - Color catalog
+    - `wood_types` - Wood type catalog
+    - `furniture_types` - Furniture type catalog
+    - `roles` - User roles
+    - `unit_of_measures` - Units of measurement
+  </Step>
+
+  <Step title="Start the Development Server">
+    Run the Flask application:
+
+    ```bash
+    python run.py
+    ```
+
+    Or using Flask CLI:
+
+    ```bash
+    flask run
+    ```
+
+    You should see output indicating the server is running:
+
+    ```bash
+    Database connection successful!
+     * Running on http://127.0.0.1:5000
+    ```
+
+    <Note>
+      The application includes a database connection test on startup to verify your configuration.
+    </Note>
+  </Step>
+
+  <Step title="Make Your First API Request">
+    Now let's create a color in the catalog. Open a new terminal and use curl:
+
+    <CodeGroup>
+      ```bash curl
+      curl -X POST http://127.0.0.1:5000/colors/create \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "name=Natural"
+      ```
+
+      ```python Python
+      import requests
+
+      response = requests.post(
+          'http://127.0.0.1:5000/colors/create',
+          data={'name': 'Natural'}
+      )
+      print(response.status_code)
+      ```
+
+      ```javascript JavaScript
+      fetch('http://127.0.0.1:5000/colors/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ name: 'Natural' })
+      })
+      .then(response => console.log(response.status));
+      ```
+    </CodeGroup>
+
+    You can also view the list of colors by visiting:
+
+    ```bash
+    curl http://127.0.0.1:5000/colors/
+    ```
+
+    Or open in your browser: [http://127.0.0.1:5000/colors/](http://127.0.0.1:5000/colors/)
+  </Step>
+</Steps>
+
+## Next Steps
+
+Congratulations! You've successfully set up the Furniture Store Backend. Here's what you can explore next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="API Reference" icon="code" href="/api/catalogs/colors">
+    Explore all available endpoints and their parameters
+  </Card>
+  <Card title="Architecture" icon="building" href="/architecture">
+    Learn about the MVC layered architecture
+  </Card>
+  <Card title="Models" icon="database" href="/database-models">
+    Understand the database schema and models
+  </Card>
+  <Card title="Development Guide" icon="wrench" href="/development/project-structure">
+    Best practices and coding conventions
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Understanding the Code
+
+The color creation request you just made flows through these layers:
+
+```python app/catalogs/colors/routes.py
+@colors_bp.route("/create", methods=["GET", "POST"])
+def create_color():
+    form = ColorForm()
+    
+    if form.validate_on_submit():
+        data = {"name": form.name.data}
+        try:
+            ColorService.create(data)
+            flash("Color creado exitosamente", "success")
+            return redirect(url_for("colors.create_color"))
+        except ConflictError as e:
+            flash(e.message, "error")
+    
+    return render_template("colors/create.html", form=form)
+```
+
+The `ColorService.create()` method handles the business logic:
+
+```python app/catalogs/colors/services.py
+@staticmethod
+def create(data: dict) -> dict:
+    name = data.get("name")
+    
+    if not name or not name.strip():
+        raise ValidationError("El nombre del color es requerido")
+    
+    name = name.strip()
+    
+    # Check for duplicates
+    existing = Color.query.filter(func.lower(Color.name) == name.lower()).first()
+    if existing:
+        raise ConflictError(f"Ya existe un color con el nombre '{name}'")
+    
+    color = Color(name=name)
+    db.session.add(color)
+    db.session.commit()
+    
+    return color.to_dict()
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    Verify your `.env` file has correct database credentials and that MySQL is running:
+    
+    ```bash
+    mysql -u your_user -p -e "SELECT 1;"
+    ```
+  </Accordion>
+
+  <Accordion title="ModuleNotFoundError">
+    Ensure your virtual environment is activated and dependencies are installed:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Accordion>
+
+  <Accordion title="Migration errors">
+    If migrations fail, ensure the database exists and is accessible:
+    
+    ```bash
+    flask db current
+    ```
+  </Accordion>
+</AccordionGroup>
